@@ -68,12 +68,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <textarea id="urls" placeholder="https://www.youtube.com/watch?v=..."></textarea>
   <div class="row"><button id="add">追加</button></div>
   <details style="margin-top:12px">
-    <summary>プレイリストから読み込む（YouTube Data APIキーが必要）</summary>
+    <summary>プレイリストから読み込む（APIキー不要）</summary>
     <div class="row">
-      <div class="grow"><label class="lab" for="key">APIキー</label><input id="key" type="password" autocomplete="off"></div>
+      <div class="grow"><label class="lab" for="key">APIキー（任意）</label><input id="key" type="password" autocomplete="off"></div>
       <div class="grow"><label class="lab" for="pl">プレイリストのURL</label><input id="pl" placeholder="https://www.youtube.com/playlist?list=..."></div>
     </div>
     <div class="row"><button id="plgo" class="ghost">読み込む</button></div>
+    <div id="tmpbox" hidden style="width:200px;height:113px;margin-top:8px"></div>
+    <p class="empty" style="font-size:13px">公開または限定公開のプレイリストが対象です。APIキーを入れると、曲名の取得が速くなり、サビ候補の検索も使えます。</p>
   </details>
 </section>
 
@@ -197,20 +199,42 @@ async function addIds(ids,titles){
   save();resetBag();render();
 }
 $('#add').onclick=()=>{const ids=$('#urls').value.split(/\s+/).map(vid).filter(Boolean);if(ids.length){addIds(ids);$('#urls').value=''}};
+$('#key').onchange=e=>{S.key=e.target.value.trim();save()};
+function playlistIds(pid){
+  return new Promise((res,rej)=>{
+    if(!window.YT||!YT.Player)return rej(new Error('プレーヤーを準備中です。少し待ってからもう一度押してください'));
+    const box=$('#tmpbox');box.hidden=false;box.innerHTML='<div id="tmpp"></div>';
+    let done=false,poll=null,pl=null;
+    const to=setTimeout(()=>fin(rej,new Error('読み込めませんでした。公開または限定公開のプレイリストか確認してください')),15000);
+    function fin(f,v){if(done)return;done=true;clearTimeout(to);clearInterval(poll);try{pl.destroy()}catch(e){}box.hidden=true;box.innerHTML='';f(v)}
+    pl=new YT.Player('tmpp',{width:'100%',height:'100%',playerVars:{playsinline:1,listType:'playlist',list:pid},events:{
+      onReady:()=>{poll=setInterval(()=>{try{const ids=pl.getPlaylist();if(ids&&ids.length)fin(res,ids)}catch(e){}},300)},
+      onError:()=>fin(rej,new Error('このプレイリストは読み込めません（非公開、または埋め込み不可）'))}});
+  });
+}
 $('#plgo').onclick=async()=>{
   S.key=$('#key').value.trim();save();
   const m=$('#pl').value.match(/list=([\w-]+)/),pid=m?m[1]:$('#pl').value.trim();
-  if(!S.key||!pid){alert('APIキーとプレイリストURLを入力してください。');return}
+  if(!pid){alert('プレイリストのURLを入力してください。');return}
+  const btn=$('#plgo');btn.disabled=true;btn.textContent='読み込み中…';
   try{
-    let tok='',ids=[],tt=[];
-    do{
-      const r=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${pid}&key=${S.key}${tok?'&pageToken='+tok:''}`);
-      const j=await r.json();if(j.error)throw new Error(j.error.message);
-      j.items.forEach(x=>{ids.push(x.snippet.resourceId.videoId);tt.push(x.snippet.title)});
-      tok=j.nextPageToken||'';
-    }while(tok&&ids.length<200);
+    let ids=null,tt=null;
+    if(S.key){
+      try{
+        let tok='';ids=[];tt=[];
+        do{
+          const r=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${pid}&key=${S.key}${tok?'&pageToken='+tok:''}`);
+          const j=await r.json();if(j.error)throw new Error(j.error.message);
+          j.items.forEach(x=>{ids.push(x.snippet.resourceId.videoId);tt.push(x.snippet.title)});
+          tok=j.nextPageToken||'';
+        }while(tok&&ids.length<200);
+      }catch(e){ids=null;tt=null}
+    }
+    if(!ids||!ids.length)ids=await playlistIds(pid);
+    if(!ids.length)throw new Error('曲が見つかりませんでした');
     addIds(ids,tt);
   }catch(err){alert('読み込めませんでした: '+err.message)}
+  btn.disabled=false;btn.textContent='読み込む';
 };
 
 /* ---- player ---- */
@@ -392,7 +416,7 @@ const stamps=txt=>{const o=[],re=/(?:(\d{1,2}):)?(\d{1,2}):(\d{2})/g;let m;while
 $('#find').onclick=async()=>{
   const t=tracks[idx],box=$('#cands');
   if(!t||!armed){alert('先に曲を再生してください。');return}
-  if(!S.key){alert('APIキーが必要です。「プレイリストから読み込む」の欄にキーを入力して一度読み込むと保存されます。');return}
+  if(!S.key){alert('サビ候補の検索にはAPIキーが必要です。「プレイリストから読み込む」の欄にキーを入力してください。');return}
   box.textContent='検索中…';
   const d=P().getDuration()||0,score=new Map();
   const add=(sec,w)=>{
