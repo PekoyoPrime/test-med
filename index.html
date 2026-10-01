@@ -51,6 +51,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <div id="ios" class="warn" hidden>iPhone / iPadでは音量を制御できないため、曲間はフェードせず切り替わります。次の曲を先読みして待ち時間を短くしています（ブロックされた場合は自動で通常の切り替えに戻ります）。画面をロックすると再生が止まります。</div>
 
 <section>
+  <h2>メドレー</h2>
+  <select id="lsel" aria-label="メドレーを切り替え"></select>
+  <div class="row"><button class="ghost" id="lnew">新規</button><button class="ghost" id="lren">名前変更</button><button class="ghost" id="ldup">複製</button><button class="ghost" id="ldel">削除</button></div>
+  <div class="row"><button id="lshare">共有リンクを作る</button></div>
+  <input id="shareurl" readonly hidden style="margin-top:8px" aria-label="共有リンク">
+  <details style="margin-top:12px"><summary>共有リンクから取り込む</summary>
+    <div class="row"><input class="grow" id="imp" placeholder="共有リンクを貼り付け"><button id="impgo" class="ghost">取り込む</button></div>
+  </details>
+  <p class="empty" style="font-size:13px">曲・開始位置・長さ・再生設定をまとめて、この端末に自動保存します。</p>
+</section>
+
+<section>
   <h2>曲を追加</h2>
   <label class="lab" for="urls">YouTubeのURLまたは動画ID（1行に1曲）</label>
   <textarea id="urls" placeholder="https://www.youtube.com/watch?v=..."></textarea>
@@ -84,6 +96,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <h2>プレーヤー</h2>
   <div class="players" id="pbox"></div>
 </section>
+
+<section id="assist">
+  <h2>サビ位置の補助</h2>
+  <div id="atitle" class="empty">曲を再生すると使えます。操作すると、その曲は自動で切り替わらず試聴モードになります。</div>
+  <input id="seek" type="range" min="0" max="100" value="0" step="1" aria-label="再生位置" style="padding:0;border:0;background:none">
+  <div id="pos" class="lab">0:00 / 0:00</div>
+  <div class="row">
+    <button class="ghost" data-j="-10">−10秒</button><button class="ghost" data-j="-5">−5秒</button>
+    <button class="ghost" data-j="5">＋5秒</button><button class="ghost" data-j="10">＋10秒</button>
+  </div>
+  <div class="row">
+    <span class="lab" style="margin:0">曲の何割あたりへ</span>
+    <button class="ghost" data-p="20">20%</button><button class="ghost" data-p="35">35%</button><button class="ghost" data-p="50">50%</button><button class="ghost" data-p="65">65%</button><button class="ghost" data-p="80">80%</button>
+  </div>
+  <div class="row"><button id="find">コメントと概要欄から候補を探す</button><button id="setstart2">ここを開始に</button></div>
+  <div class="row" id="cands"></div>
+</section>
 </main>
 
 <div class="bar"><div class="in">
@@ -103,8 +132,19 @@ const iOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='Mac
 let tracks=[],S={fade:3,ds:45,dl:30,key:'',loop:true,shuffle:false};
 let idx=-1,cur=0,players=[],running=false,armed=false,fading=false,fadeTimer=null;
 
-try{const d=JSON.parse(localStorage.getItem('medley')||'null');if(d){tracks=d.tracks||[];Object.assign(S,d.S||{})}}catch(e){}
-const save=()=>{try{localStorage.setItem('medley',JSON.stringify({tracks,S}))}catch(e){}};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const pick=o=>({fade:o.fade,ds:o.ds,dl:o.dl,loop:o.loop,shuffle:o.shuffle});
+let lists=[],lid='';
+try{
+  const d=JSON.parse(localStorage.getItem('medley2')||'null');
+  if(d&&d.lists&&d.lists.length){lists=d.lists;lid=d.lid;S.key=d.key||''}
+  else{const o=JSON.parse(localStorage.getItem('medley')||'null');
+    if(o){lists=[{id:uid(),name:'メドレー1',tracks:o.tracks||[],S:pick(Object.assign({},S,o.S||{}))}];S.key=(o.S&&o.S.key)||''}}
+}catch(e){}
+if(!lists.length)lists=[{id:uid(),name:'メドレー1',tracks:[],S:pick(S)}];
+{const l0=lists.find(x=>x.id===lid)||lists[0];lid=l0.id;tracks=l0.tracks=l0.tracks||[];Object.assign(S,l0.S||{})}
+function sync(){const l=lists.find(x=>x.id===lid);if(l){l.tracks=tracks;l.S=pick(S)}}
+function save(){sync();try{localStorage.setItem('medley2',JSON.stringify({lists,lid,key:S.key}))}catch(e){}}
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 const parseT=v=>{v=String(v).trim();if(v.includes(':')){const[a,b]=v.split(':');return (+a||0)*60+(+b||0)}return +v||0};
@@ -119,6 +159,7 @@ $('#loop').onchange=e=>{S.loop=e.target.checked;save()};
 $('#shuffle').onchange=e=>{S.shuffle=e.target.checked;resetBag();save()};
 
 function render(){
+  renderLists();
   const L=$('#list');
   if(!tracks.length){L.innerHTML='<p class="empty">まだ曲がありません。上のフォームから追加してください。</p>';return}
   L.innerHTML=tracks.map((t,i)=>`<div class="tr${i===idx?' on':''}" data-i="${i}">
@@ -196,19 +237,24 @@ function preload(){
   const n=nextIdx();if(n<0)return;
   const t=tracks[n];players[1-cur].cueVideoById({videoId:t.id,startSeconds:t.start});preId=n;
 }
+let wl=null;
+async function keepAwake(){
+  try{if('wakeLock' in navigator&&!wl){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>{wl=null})}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running)keepAwake()});
 function cutTo(i){
   if(players.length<2||!tracks[i])return;
   clearInterval(fadeTimer);fading=false;pendingPause=null;
   players.forEach((p,k)=>{if(k!==cur)p.pauseVideo()});
-  idx=i;armed=false;used(i);const t=tracks[i];
+  idx=i;armed=false;hold=false;used(i);const t=tracks[i];
   P().setVolume(100);P().loadVideoById({videoId:t.id,startSeconds:t.start});
-  running=true;render();
+  running=true;keepAwake();render();
 }
 function fadeTo(i){
   const t=tracks[i];if(!t)return;
   if(noSwap||fading)return cutTo(i);
   const from=P(),o=1-cur,to=players[o],hard=iOS||S.fade<=0;
-  idx=i;cur=o;armed=false;used(i);
+  idx=i;cur=o;armed=false;hold=false;used(i);
   to.setVolume(hard?100:0);
   if(preId===i)to.playVideo();else to.loadVideoById({videoId:t.id,startSeconds:t.start});
   preId=-1;
@@ -244,11 +290,132 @@ setInterval(()=>{
   const t=tracks[idx];if(!running||!t||players.length<2||!armed||!P().getCurrentTime)return;
   const rem=t.len-(P().getCurrentTime()-t.start);
   $('#prog i').style.width=Math.min(100,Math.max(0,100*(1-rem/t.len)))+'%';
-  setNow((idx+1)+'/'+tracks.length+'　'+(t.title||t.id)+'　残り'+Math.max(0,Math.ceil(rem))+'秒');
+  setNow((idx+1)+'/'+tracks.length+'　'+(t.title||t.id)+'　残り'+Math.max(0,Math.ceil(rem))+'秒');assistUI(t);
   if(!fading&&!pendingPause){const n=nextIdx();if(n>=0&&preId!==n)preload()}
   const lead=(iOS||S.fade<=0)?1:S.fade;
-  if(rem<=lead&&!fading)goNext(false);
+  if(!hold&&rem<=lead&&!fading)goNext(false);
 },200);
+
+/* ---- メドレーの保存・切り替え・共有 ---- */
+const b64e=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64d=t=>JSON.parse(decodeURIComponent(escape(atob(t.replace(/-/g,'+').replace(/_/g,'/')))));
+function renderLists(){
+  $('#lsel').innerHTML=lists.map(l=>`<option value="${l.id}"${l.id===lid?' selected':''}>${esc(l.name)}（${l.tracks.length}曲）</option>`).join('');
+}
+function stopAll(){
+  running=false;clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;preId=-1;
+  players.forEach(p=>{try{p.pauseVideo()}catch(e){}});
+  setNow('停止中');$('#prog i').style.width='0';$('#pp').textContent='再生';
+}
+function applyS(){$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle}
+function loadList(l){
+  stopAll();lid=l.id;tracks=l.tracks;
+  S=Object.assign({key:S.key,fade:3,ds:45,dl:30,loop:true,shuffle:false},l.S||{});
+  applyS();resetBag();render();save();
+}
+function switchTo(id){save();const l=lists.find(x=>x.id===id);if(l)loadList(l)}
+const curList=()=>lists.find(x=>x.id===lid);
+$('#lsel').onchange=e=>switchTo(e.target.value);
+$('#lnew').onclick=()=>{
+  const n=prompt('新しいメドレーの名前','メドレー'+(lists.length+1));if(!n)return;
+  save();const l={id:uid(),name:n.slice(0,40),tracks:[],S:pick(S)};lists.push(l);loadList(l);
+};
+$('#lren').onclick=()=>{const l=curList(),n=prompt('名前を変更',l.name);if(!n)return;l.name=n.slice(0,40);save();renderLists()};
+$('#ldup').onclick=()=>{
+  sync();const l=curList(),c={id:uid(),name:l.name+'のコピー',tracks:l.tracks.map(t=>({...t})),S:{...l.S}};
+  lists.push(c);loadList(c);
+};
+$('#ldel').onclick=()=>{
+  if(lists.length<2){alert('最後の1つは削除できません。');return}
+  const l=curList();if(!confirm('「'+l.name+'」を削除しますか？'))return;
+  lists=lists.filter(x=>x.id!==lid);loadList(lists[0]);
+};
+function fetchTitle(t){
+  fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+t.id))
+    .then(r=>r.json()).then(j=>{t.title=j.title;save();render()}).catch(()=>{});
+}
+$('#lshare').onclick=async()=>{
+  sync();const l=curList();
+  if(!tracks.length){alert('曲がありません。');return}
+  const code=b64e([1,l.name,[S.fade,S.ds,S.dl,S.loop?1:0,S.shuffle?1:0],tracks.map(t=>[t.id,t.start,t.len])]);
+  const url=location.origin+location.pathname+'#m='+code;
+  const box=$('#shareurl');box.value=url;box.hidden=false;
+  try{if(navigator.share){await navigator.share({title:'メドレー「'+l.name+'」',url});return}}catch(e){if(e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(url);alert('共有リンクをコピーしました。')}
+  catch(e){box.select();alert('下の欄のリンクをコピーして共有してください。')}
+};
+function parseShare(text){
+  const m=String(text).match(/#?m=([\w-]+)/),code=m?m[1]:String(text).trim();
+  try{const d=b64d(code);if(Array.isArray(d)&&d[0]===1&&Array.isArray(d[2])&&Array.isArray(d[3]))return d}catch(e){}
+  return null;
+}
+function importShare(d){
+  const n=x=>+x||0,s=d[2];
+  const l={id:uid(),name:String(d[1]||'共有メドレー').slice(0,40),
+    tracks:d[3].slice(0,200).filter(x=>Array.isArray(x)&&/^[\w-]{11}$/.test(x[0])).map(x=>({id:x[0],title:'',start:Math.max(0,n(x[1])),len:Math.min(120,Math.max(5,n(x[2])||30))})),
+    S:{fade:Math.min(8,Math.max(0,n(s[0]))),ds:Math.max(0,n(s[1])),dl:Math.min(120,Math.max(5,n(s[2])||30)),loop:!!s[3],shuffle:!!s[4]}};
+  save();lists.push(l);loadList(l);l.tracks.forEach(fetchTitle);
+}
+$('#impgo').onclick=()=>{
+  const d=parseShare($('#imp').value);
+  if(!d){alert('共有リンクを読み取れませんでした。');return}
+  importShare(d);$('#imp').value='';
+};
+function handleHash(){
+  if(!location.hash.startsWith('#m='))return;
+  const d=parseShare(location.hash);history.replaceState(null,'',location.pathname+location.search);
+  if(d&&confirm('共有されたメドレー「'+d[1]+'」（'+d[3].length+'曲）を取り込みますか？'))importShare(d);
+}
+window.addEventListener('hashchange',handleHash);
+
+/* ---- サビ位置の補助 ---- */
+let hold=false,dragging=false;
+function assistUI(t){
+  const d=P().getDuration?P().getDuration():0,c=P().getCurrentTime();
+  $('#atitle').textContent=t.title||t.id;
+  const sk=$('#seek');if(d>0){sk.max=Math.floor(d);if(!dragging)sk.value=Math.floor(c)}
+  if(!dragging)$('#pos').textContent=fmt(c)+' / '+fmt(d)+'　（開始位置 '+fmt(t.start)+'）';
+  if(hold)setNow('試聴中（自動で切り替わりません）　'+(t.title||t.id));
+}
+function jump(sec){
+  if(players.length<2||idx<0||!armed)return;
+  hold=true;P().seekTo(Math.max(0,sec),true);P().playVideo();
+}
+$('#seek').addEventListener('input',()=>{dragging=true;$('#pos').textContent=fmt(+$('#seek').value)});
+$('#seek').addEventListener('change',()=>{dragging=false;jump(+$('#seek').value)});
+document.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{if(idx>=0&&armed)jump(P().getCurrentTime()+ +b.dataset.j)});
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const d=idx>=0?P().getDuration():0;if(d)jump(d*b.dataset.p/100)});
+$('#setstart2').onclick=()=>$('#setstart').click();
+$('#cands').onclick=e=>{const v=e.target.dataset.c;if(v)jump(+v-2)};
+
+const stamps=txt=>{const o=[],re=/(?:(\d{1,2}):)?(\d{1,2}):(\d{2})/g;let m;while((m=re.exec(txt)))o.push((+(m[1]||0))*3600+(+m[2])*60+(+m[3]));return o};
+$('#find').onclick=async()=>{
+  const t=tracks[idx],box=$('#cands');
+  if(!t||!armed){alert('先に曲を再生してください。');return}
+  if(!S.key){alert('APIキーが必要です。「プレイリストから読み込む」の欄にキーを入力して一度読み込むと保存されます。');return}
+  box.textContent='検索中…';
+  const d=P().getDuration()||0,score=new Map();
+  const add=(sec,w)=>{
+    if(sec<5||(d&&sec>d))return;
+    for(const k of score.keys())if(Math.abs(k-sec)<=3){score.set(k,score.get(k)+w);return}
+    score.set(sec,w);
+  };
+  try{
+    const base='https://www.googleapis.com/youtube/v3/';
+    const [v,c]=await Promise.all([
+      fetch(`${base}videos?part=snippet&id=${t.id}&key=${S.key}`).then(r=>r.json()),
+      fetch(`${base}commentThreads?part=snippet&videoId=${t.id}&order=relevance&maxResults=100&textFormat=plainText&key=${S.key}`).then(r=>r.json())
+    ]);
+    const desc=(v.items&&v.items[0]&&v.items[0].snippet.description)||'';
+    desc.split('\n').forEach(l=>{if(/サビ|ｻﾋﾞ|chorus|hook/i.test(l))stamps(l).forEach(s=>add(s,5))});
+    (c.items||[]).forEach(x=>{
+      const sn=x.snippet.topLevelComment.snippet,w=1+Math.min(sn.likeCount||0,50)/10+(/サビ|chorus|hook|ここ/i.test(sn.textDisplay)?1:0);
+      stamps(sn.textDisplay).forEach(s=>add(s,w));
+    });
+    const top=[...score.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
+    box.innerHTML=top.length?top.map(([s,w])=>`<button class="ghost" data-c="${s}">${fmt(s)}（スコア${Math.round(w)}）</button>`).join(''):'<span class="empty">タイムスタンプが見つかりませんでした。</span>';
+  }catch(err){box.textContent='取得できませんでした: '+err.message}
+};
 
 $('#pp').onclick=()=>{
   if(players.length<2){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
@@ -260,9 +427,9 @@ $('#next').onclick=()=>{if(tracks.length){running=true;const n=nextIdx();cutTo(n
 $('#prev').onclick=()=>{if(tracks.length){running=true;cutTo(Math.max(0,idx-1))}};
 $('#setstart').onclick=()=>{
   const t=tracks[idx];if(!t||!players.length)return;
-  t.start=Math.floor(P().getCurrentTime());save();render();
+  t.start=Math.floor(P().getCurrentTime());hold=false;save();render();
 };
-resetBag();render();
+resetBag();render();handleHash();
 </script>
 </body>
 </html>
