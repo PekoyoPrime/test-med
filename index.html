@@ -8,7 +8,7 @@
 :root{--bg:#e9eef2;--sf:#fff;--ink:#16202b;--mute:#5d6b78;--ac:#0b7a75;--ac-ink:#fff;--hot:#e39b00;--line:#cfd8df}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1a22;--sf:#16252f;--ink:#e6eef3;--mute:#8da0ae;--ac:#3cc3b8;--ac-ink:#06201e;--hot:#f2b93b;--line:#28404e}}
 *{box-sizing:border-box}
-html,body{margin:0}
+html,body{margin:0;overflow-x:hidden;-webkit-text-size-adjust:100%}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 "Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 calc(150px + env(safe-area-inset-bottom))}
 main{max-width:760px;margin:0 auto;padding:16px}
 h1{font-size:22px;margin:8px 0 2px;letter-spacing:.02em}
@@ -16,6 +16,7 @@ h2{font-size:15px;margin:0 0 8px}
 p.sub{margin:0 0 16px;color:var(--mute)}
 section{background:var(--sf);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
 textarea,input,select,button{font:inherit;color:inherit}
+textarea,input,select{font-size:16px}
 textarea,input,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
 textarea{min-height:76px;resize:vertical}
 button{background:var(--ac);color:var(--ac-ink);border:0;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:600}
@@ -25,11 +26,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .grow{flex:1;min-width:140px}
 .lab{font-size:12px;color:var(--mute);display:block;margin-bottom:2px}
 .warn{background:color-mix(in srgb,var(--hot) 18%,transparent);border-left:4px solid var(--hot);padding:8px 10px;border-radius:4px;margin-bottom:14px;font-size:13px}
-.tr{display:grid;grid-template-columns:40px 1fr;gap:6px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.tr{display:grid;grid-template-columns:40px minmax(0,1fr);gap:6px 10px;padding:10px 0;border-top:1px solid var(--line)}
 .tr:first-child{border-top:0}
 .tr.on{border-left:4px solid var(--ac);padding-left:8px}
 .tr .go{width:40px;height:40px;padding:0;border-radius:50%}
-.tr .ttl{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:center}
+.tr .ttl{min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:center}
 .tr .ctl{grid-column:2;display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}
 .tr .ctl label{width:78px}
 .tr .ctl button{padding:8px 10px}
@@ -47,7 +48,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <main>
 <h1>メドレーメーカー</h1>
 <p class="sub">YouTubeの曲を、好きな位置から好きな長さでつないで再生します。</p>
-<div id="ios" class="warn" hidden>iPhone / iPadでは音量を制御できないため、曲間はフェードせず切り替わります。画面を閉じたりロックすると再生が止まります。</div>
+<div id="ios" class="warn" hidden>iPhone / iPadでは音量を制御できないため、曲間はフェードせず切り替わります。次の曲を先読みして待ち時間を短くしています（ブロックされた場合は自動で通常の切り替えに戻ります）。画面をロックすると再生が止まります。</div>
 
 <section>
   <h2>曲を追加</h2>
@@ -71,7 +72,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="grow"><label class="lab" for="ds">新しい曲の開始位置</label><input id="ds" placeholder="0:45"></div>
     <div class="grow"><label class="lab" for="dl">新しい曲の長さ（15〜60秒）</label><input id="dl" type="number" min="5" max="120"></div>
   </div>
-  <div class="row"><label><input id="loop" type="checkbox" style="width:auto"> 最後まで行ったら最初に戻る</label></div>
+  <div class="row"><label><input id="shuffle" type="checkbox" style="width:auto"> シャッフル</label><label><input id="loop" type="checkbox" style="width:auto"> 最後まで行ったら最初に戻る</label></div>
 </section>
 
 <section>
@@ -99,7 +100,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <script>
 const $=s=>document.querySelector(s);
 const iOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-let tracks=[],S={fade:3,ds:45,dl:30,key:'',loop:true};
+let tracks=[],S={fade:3,ds:45,dl:30,key:'',loop:true,shuffle:false};
 let idx=-1,cur=0,players=[],running=false,armed=false,fading=false,fadeTimer=null;
 
 try{const d=JSON.parse(localStorage.getItem('medley')||'null');if(d){tracks=d.tracks||[];Object.assign(S,d.S||{})}}catch(e){}
@@ -110,11 +111,12 @@ const parseT=v=>{v=String(v).trim();if(v.includes(':')){const[a,b]=v.split(':');
 const vid=s=>{s=s.trim();let m=s.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);if(m)return m[1];return /^[\w-]{11}$/.test(s)?s:null};
 
 if(iOS)$('#ios').hidden=false;
-$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#key').value=S.key;$('#loop').checked=S.loop;
+$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#key').value=S.key;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle;
 $('#fade').onchange=e=>{S.fade=Math.min(8,Math.max(0,+e.target.value||0));e.target.value=S.fade;save()};
 $('#ds').onchange=e=>{S.ds=parseT(e.target.value);e.target.value=fmt(S.ds);save()};
 $('#dl').onchange=e=>{S.dl=Math.min(120,Math.max(5,+e.target.value||30));e.target.value=S.dl;save()};
 $('#loop').onchange=e=>{S.loop=e.target.checked;save()};
+$('#shuffle').onchange=e=>{S.shuffle=e.target.checked;resetBag();save()};
 
 function render(){
   const L=$('#list');
@@ -142,7 +144,7 @@ $('#list').addEventListener('click',e=>{
   if(a==='del'){tracks.splice(i,1);if(i<idx)idx--;else if(i===idx){idx=-1}}
   if(a==='up'&&i>0){[tracks[i-1],tracks[i]]=[tracks[i],tracks[i-1]];if(idx===i)idx--;else if(idx===i-1)idx++}
   if(a==='down'&&i<tracks.length-1){[tracks[i+1],tracks[i]]=[tracks[i],tracks[i+1]];if(idx===i)idx++;else if(idx===i+1)idx--}
-  save();render();
+  save();resetBag();render();
 });
 
 async function addIds(ids,titles){
@@ -151,7 +153,7 @@ async function addIds(ids,titles){
     if(!t.title)fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id))
       .then(r=>r.json()).then(j=>{t.title=j.title;save();render()}).catch(()=>{});
   }
-  save();render();
+  save();resetBag();render();
 }
 $('#add').onclick=()=>{const ids=$('#urls').value.split(/\s+/).map(vid).filter(Boolean);if(ids.length){addIds(ids);$('#urls').value=''}};
 $('#plgo').onclick=async()=>{
@@ -173,7 +175,7 @@ $('#plgo').onclick=async()=>{
 /* ---- player ---- */
 const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
 window.onYouTubeIframeAPIReady=()=>{
-  const n=iOS?1:2;
+  const n=2;
   for(let i=0;i<n;i++){
     $('#pbox').insertAdjacentHTML('beforeend',`<div><div id="p${i}"></div></div>`);
     players[i]=new YT.Player('p'+i,{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
@@ -181,30 +183,49 @@ window.onYouTubeIframeAPIReady=()=>{
   }
 };
 const P=()=>players[cur];
+let preId=-1,pendingPause=null,noSwap=false,bag=[],nextPick=-1;
+function resetBag(){bag=tracks.map((_,k)=>k).filter(k=>k!==idx);nextPick=-1}
+function used(i){bag=bag.filter(k=>k!==i);nextPick=-1}
+function nextIdx(){
+  if(!S.shuffle||tracks.length<2){const n=idx+1;return n<tracks.length?n:(S.loop?0:-1)}
+  if(nextPick>=0&&bag.includes(nextPick))return nextPick;
+  if(!bag.length){if(!S.loop)return -1;bag=tracks.map((_,k)=>k).filter(k=>k!==idx)}
+  return nextPick=bag[Math.floor(Math.random()*bag.length)];
+}
+function preload(){
+  const n=nextIdx();if(n<0)return;
+  const t=tracks[n];players[1-cur].cueVideoById({videoId:t.id,startSeconds:t.start});preId=n;
+}
 function cutTo(i){
-  if(!players.length||!tracks[i])return;
-  clearInterval(fadeTimer);fading=false;
+  if(players.length<2||!tracks[i])return;
+  clearInterval(fadeTimer);fading=false;pendingPause=null;
   players.forEach((p,k)=>{if(k!==cur)p.pauseVideo()});
-  idx=i;armed=false;const t=tracks[i];
+  idx=i;armed=false;used(i);const t=tracks[i];
   P().setVolume(100);P().loadVideoById({videoId:t.id,startSeconds:t.start});
   running=true;render();
 }
 function fadeTo(i){
   const t=tracks[i];if(!t)return;
-  if(iOS||S.fade<=0||fading)return cutTo(i);
-  const from=P(),o=1-cur,to=players[o];
-  idx=i;cur=o;armed=false;fading=true;
-  to.setVolume(0);to.loadVideoById({videoId:t.id,startSeconds:t.start});
-  const t0=Date.now(),ms=S.fade*1000;
-  clearInterval(fadeTimer);
-  fadeTimer=setInterval(()=>{
-    const r=Math.min(1,(Date.now()-t0)/ms);
-    from.setVolume(Math.round(100*(1-r)));to.setVolume(Math.round(100*r));
-    if(r>=1){clearInterval(fadeTimer);from.pauseVideo();fading=false}
-  },80);
+  if(noSwap||fading)return cutTo(i);
+  const from=P(),o=1-cur,to=players[o],hard=iOS||S.fade<=0;
+  idx=i;cur=o;armed=false;used(i);
+  to.setVolume(hard?100:0);
+  if(preId===i)to.playVideo();else to.loadVideoById({videoId:t.id,startSeconds:t.start});
+  preId=-1;
+  if(hard){
+    pendingPause=from;
+    setTimeout(()=>{if(idx===i&&!armed&&running&&cur===o){noSwap=iOS;pendingPause=null;to.pauseVideo();cur=1-o;cutTo(i)}},4500);
+  }else{
+    fading=true;const t0=Date.now(),ms=S.fade*1000;
+    clearInterval(fadeTimer);
+    fadeTimer=setInterval(()=>{
+      const r=Math.min(1,(Date.now()-t0)/ms);
+      from.setVolume(Math.round(100*(1-r)));to.setVolume(Math.round(100*r));
+      if(r>=1){clearInterval(fadeTimer);from.pauseVideo();fading=false}
+    },80);
+  }
   render();
 }
-function nextIdx(){const n=idx+1;if(n<tracks.length)return n;return S.loop?0:-1}
 function goNext(cut){
   const n=nextIdx();
   if(n<0){running=false;P().pauseVideo();setNow('おわり');return}
@@ -212,7 +233,7 @@ function goNext(cut){
 }
 function onState(i,e){
   if(i!==cur)return;
-  if(e.data===1)armed=true;
+  if(e.data===1){if(pendingPause){pendingPause.pauseVideo();pendingPause=null}armed=true}
   if(e.data===0&&running&&armed){armed=false;goNext(true)}
   $('#pp').textContent=(e.data===1)?'一時停止':'再生';
 }
@@ -220,17 +241,19 @@ function onErr(i){if(i===cur&&running){setTimeout(()=>goNext(true),500)}}
 function setNow(s){$('#now').textContent=s}
 
 setInterval(()=>{
-  const t=tracks[idx];if(!running||!t||!players.length||!armed||!P().getCurrentTime)return;
+  const t=tracks[idx];if(!running||!t||players.length<2||!armed||!P().getCurrentTime)return;
   const rem=t.len-(P().getCurrentTime()-t.start);
   $('#prog i').style.width=Math.min(100,Math.max(0,100*(1-rem/t.len)))+'%';
   setNow((idx+1)+'/'+tracks.length+'　'+(t.title||t.id)+'　残り'+Math.max(0,Math.ceil(rem))+'秒');
-  if(rem<=(iOS?0:S.fade)&&!fading)goNext(false);
+  if(!fading&&!pendingPause){const n=nextIdx();if(n>=0&&preId!==n)preload()}
+  const lead=(iOS||S.fade<=0)?1:S.fade;
+  if(rem<=lead&&!fading)goNext(false);
 },200);
 
 $('#pp').onclick=()=>{
-  if(!players.length){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
+  if(players.length<2){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
   if(!tracks.length){alert('先に曲を追加してください。');return}
-  if(idx<0||!running){cutTo(idx<0?0:idx);return}
+  if(idx<0||!running){if(idx<0){resetBag();cutTo(S.shuffle?Math.floor(Math.random()*tracks.length):0)}else cutTo(idx);return}
   P().getPlayerState()===1?P().pauseVideo():P().playVideo();
 };
 $('#next').onclick=()=>{if(tracks.length){running=true;const n=nextIdx();cutTo(n<0?0:n)}};
@@ -239,7 +262,7 @@ $('#setstart').onclick=()=>{
   const t=tracks[idx];if(!t||!players.length)return;
   t.start=Math.floor(P().getCurrentTime());save();render();
 };
-render();
+resetBag();render();
 </script>
 </body>
 </html>
