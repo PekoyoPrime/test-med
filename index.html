@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>メドレーメーカー</title>
 <style>
-:root{--bg:#e9eef2;--sf:#fff;--ink:#16202b;--mute:#5d6b78;--ac:#0b7a75;--ac-ink:#fff;--hot:#e39b00;--line:#cfd8df}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1a22;--sf:#16252f;--ink:#e6eef3;--mute:#8da0ae;--ac:#3cc3b8;--ac-ink:#06201e;--hot:#f2b93b;--line:#28404e}}
+:root{--bg:#e9eef2;--sf:#fff;--ink:#16202b;--mute:#5d6b78;--ac:#0b7a75;--ac-ink:#fff;--hot:#e39b00;--line:#cfd8df;--ok:#1c8a4a;--ng:#c43d3d}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1a22;--sf:#16252f;--ink:#e6eef3;--mute:#8da0ae;--ac:#3cc3b8;--ac-ink:#06201e;--hot:#f2b93b;--line:#28404e;--ok:#4ed08a;--ng:#ff7b7b}}
 *{box-sizing:border-box}
 html,body{margin:0;overflow-x:hidden;-webkit-text-size-adjust:100%}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 "Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 calc(150px + env(safe-area-inset-bottom))}
@@ -42,6 +42,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #prog{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:6px 0 8px}
 #prog i{display:block;height:100%;width:0;background:var(--ac)}
 .empty{color:var(--mute);margin:4px 0}
+.tab{flex:1;background:transparent;color:var(--ink);border:1px solid var(--line)}
+.tab[aria-selected=true]{background:var(--ac);color:var(--ac-ink);border-color:var(--ac)}
+[hidden]{display:none!important}
+body.q .bar{display:none}
+body.q #psec{margin-top:110vh}
+.choice{display:block;width:100%;text-align:left;margin-top:8px;background:var(--sf);color:var(--ink);border:2px solid var(--line);font-weight:500;padding:12px;overflow-wrap:anywhere}
+.choice.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 18%,transparent)}
+.choice.ng{border-color:var(--ng);background:color-mix(in srgb,var(--ng) 18%,transparent)}
+#qfb{font-weight:700;margin:12px 0 0;min-height:1.5em;overflow-wrap:anywhere}
+#qscore{font-size:34px;font-weight:700;margin:4px 0 8px}
+.rl{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;padding:6px 0;border-top:1px solid var(--line)}
+.rl b.ok{color:var(--ok)}.rl b.ng{color:var(--ng)}
 </style>
 </head>
 <body>
@@ -50,6 +62,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <p class="sub">YouTubeの曲を、好きな位置から好きな長さでつないで再生します。</p>
 <div id="ios" class="warn" hidden>iPhone / iPadでは音量を制御できないため、曲間はフェードせず切り替わります。次の曲を先読みして待ち時間を短くしています（ブロックされた場合は自動で通常の切り替えに戻ります）。画面をロックすると再生が止まります。</div>
 
+<div id="tabs" class="row" role="tablist" style="margin:0 0 14px">
+  <button class="tab" id="tab-med" role="tab" aria-selected="true">メドレー</button>
+  <button class="tab" id="tab-quiz" role="tab" aria-selected="false">イントロクイズ</button>
+</div>
+<div id="t-med">
 <section>
   <h2>メドレー</h2>
   <select id="lsel" aria-label="メドレーを切り替え"></select>
@@ -90,13 +107,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 </section>
 
 <section>
-  <h2>曲リスト</h2>
+  <div class="row" style="margin:0 0 8px;justify-content:space-between"><h2 style="margin:0">曲リスト</h2><button class="ghost" id="clearall">全曲を削除</button></div>
   <div id="list"></div>
-</section>
-
-<section>
-  <h2>プレーヤー</h2>
-  <div class="players" id="pbox"></div>
 </section>
 
 <section id="assist">
@@ -114,6 +126,43 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </div>
   <div class="row"><button id="find">コメントと概要欄から候補を探す</button><button id="setstart2">ここを開始に</button></div>
   <div class="row" id="cands"></div>
+</section>
+</div>
+
+<div id="t-quiz" hidden>
+<section id="qsetup">
+  <h2>イントロクイズ</h2>
+  <p class="empty" id="qinfo"></p>
+  <details><summary>共有リンクから取り込む</summary>
+    <div class="row"><input class="grow" id="qlink" placeholder="共有リンクを貼り付け"><button id="qimp" class="ghost">取り込む</button></div>
+  </details>
+  <label class="lab" for="qmode">出題する場所</label>
+  <select id="qmode"><option value="intro">曲の最初（イントロ）</option><option value="list">リストの開始位置（サビなど）</option></select>
+  <label class="lab" for="qsec">再生する長さ（秒）</label>
+  <select id="qsec"><option>3</option><option selected>5</option><option>8</option><option>10</option><option>15</option><option>30</option></select>
+  <label class="lab" for="qn">問題数</label>
+  <select id="qn"></select>
+  <p class="empty" id="qmsg"></p>
+  <div class="row"><button id="qstart">クイズを始める</button></div>
+</section>
+<section id="qgame" hidden>
+  <h2 id="qno"></h2>
+  <div class="row" style="margin-top:0"><button id="qlisten">▶ 聞く</button></div>
+  <div id="qch"></div>
+  <p id="qfb"></p>
+  <div class="row"><button id="qnext" hidden>次の問題へ</button></div>
+</section>
+<section id="qresult" hidden>
+  <h2>結果</h2>
+  <div id="qscore"></div>
+  <div id="qrl"></div>
+  <div class="row"><button id="qagain">同じ設定でもう一度</button><button class="ghost" id="qback">設定に戻る</button></div>
+</section>
+</div>
+
+<section id="psec">
+  <h2>プレーヤー</h2>
+  <div class="players" id="pbox"></div>
 </section>
 </main>
 
@@ -303,11 +352,12 @@ function goNext(cut){
 }
 function onState(i,e){
   if(i!==cur)return;
+  quizState(e);
   if(e.data===1){if(pendingPause){pendingPause.pauseVideo();pendingPause=null}armed=true}
   if(e.data===0&&running&&armed){armed=false;goNext(true)}
   $('#pp').textContent=(e.data===1)?'一時停止':'再生';
 }
-function onErr(i){if(i===cur&&running){setTimeout(()=>goNext(true),500)}}
+function onErr(i){if(i===cur&&qOn){quizErr();return}if(i===cur&&running){setTimeout(()=>goNext(true),500)}}
 function setNow(s){$('#now').textContent=s}
 
 setInterval(()=>{
@@ -327,7 +377,7 @@ function renderLists(){
   $('#lsel').innerHTML=lists.map(l=>`<option value="${l.id}"${l.id===lid?' selected':''}>${esc(l.name)}（${l.tracks.length}曲）</option>`).join('');
 }
 function stopAll(){
-  running=false;clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;preId=-1;
+  running=false;qOn=false;clearTimeout(qtimer);clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;preId=-1;
   players.forEach(p=>{try{p.pauseVideo()}catch(e){}});
   setNow('停止中');$('#prog i').style.width='0';$('#pp').textContent='再生';
 }
@@ -342,7 +392,7 @@ const curList=()=>lists.find(x=>x.id===lid);
 $('#lsel').onchange=e=>switchTo(e.target.value);
 $('#lnew').onclick=()=>{
   const n=prompt('新しいメドレーの名前','メドレー'+(lists.length+1));if(!n)return;
-  save();const l={id:uid(),name:n.slice(0,40),tracks:[],S:pick(S)};lists.push(l);loadList(l);
+  save();const l={id:uid(),name:n.slice(0,40),tracks:[],S:{fade:3,ds:45,dl:30,loop:true,shuffle:false}};lists.push(l);loadList(l);
 };
 $('#lren').onclick=()=>{const l=curList(),n=prompt('名前を変更',l.name);if(!n)return;l.name=n.slice(0,40);save();renderLists()};
 $('#ldup').onclick=()=>{
@@ -370,15 +420,15 @@ $('#lshare').onclick=async()=>{
 };
 function parseShare(text){
   const m=String(text).match(/#?m=([\w-]+)/),code=m?m[1]:String(text).trim();
-  try{const d=b64d(code);if(Array.isArray(d)&&d[0]===1&&Array.isArray(d[2])&&Array.isArray(d[3]))return d}catch(e){}
+  try{const d=b64d(code);if(Array.isArray(d)&&(d[0]===1||d[0]===2)&&Array.isArray(d[2])&&Array.isArray(d[3]))return d}catch(e){}
   return null;
 }
 function importShare(d){
   const n=x=>+x||0,s=d[2];
   const l={id:uid(),name:String(d[1]||'共有メドレー').slice(0,40),
-    tracks:d[3].slice(0,200).filter(x=>Array.isArray(x)&&/^[\w-]{11}$/.test(x[0])).map(x=>({id:x[0],title:'',start:Math.max(0,n(x[1])),len:Math.min(120,Math.max(5,n(x[2])||30))})),
+    tracks:d[3].slice(0,200).filter(x=>Array.isArray(x)&&/^[\w-]{11}$/.test(x[0])).map(x=>({id:x[0],title:String(x[3]||'').slice(0,150),start:Math.max(0,n(x[1])),len:Math.min(120,Math.max(5,n(x[2])||30))})),
     S:{fade:Math.min(8,Math.max(0,n(s[0]))),ds:Math.max(0,n(s[1])),dl:Math.min(120,Math.max(5,n(s[2])||30)),loop:!!s[3],shuffle:!!s[4]}};
-  save();lists.push(l);loadList(l);l.tracks.forEach(fetchTitle);
+  save();lists.push(l);loadList(l);l.tracks.filter(t=>!t.title).forEach(fetchTitle);
 }
 $('#impgo').onclick=()=>{
   const d=parseShare($('#imp').value);
@@ -391,6 +441,110 @@ function handleHash(){
   if(d&&confirm('共有されたメドレー「'+d[1]+'」（'+d[3].length+'曲）を取り込みますか？'))importShare(d);
 }
 window.addEventListener('hashchange',handleHash);
+
+$('#clearall').onclick=()=>{
+  if(!tracks.length)return;
+  if(!confirm('「'+curList().name+'」の曲を全て削除しますか？'))return;
+  stopAll();tracks.length=0;save();resetBag();render();
+};
+/* ---- イントロクイズ ---- */
+let qOn=false,qItems=[],qs=[],qi=0,qscore=0,qlog=[],qlimited=false,qstarted=false,qans=false,qtimer=null,qdur=5,qmode='intro';
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const qshow=id=>['qsetup','qgame','qresult'].forEach(k=>$('#'+k).hidden=k!==id);
+function qInfo(){const l=curList();if(l)$('#qinfo').textContent='現在のメドレー：「'+l.name+'」'+tracks.length+'曲（切り替えは「メドレー」タブで）'}
+function quizPrep(){
+  const max=tracks.length,opts=[5,10,20,50].filter(v=>v<max);if(max>=2)opts.push(max);
+  $('#qn').innerHTML=opts.map(v=>`<option value="${v}"${v===Math.min(10,max)?' selected':''}>${v===max?'全部（'+v+'問）':v+'問'}</option>`).join('');
+  $('#qmsg').textContent=max<2?'クイズには2曲以上必要です。「メドレー」タブで曲を追加するか、共有リンクを取り込んでください。':(max<4?'4曲未満のため、選択肢は'+max+'つになります。':'');
+  qInfo();
+}
+function setTab(t){
+  const q=t==='quiz';
+  if(q){stopAll();qshow('qsetup');quizPrep()}
+  else{qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
+  $('#t-med').hidden=q;$('#t-quiz').hidden=!q;
+  document.body.classList.toggle('q',q);
+  $('#tab-med').setAttribute('aria-selected',String(!q));$('#tab-quiz').setAttribute('aria-selected',String(q));
+  window.scrollTo(0,0);
+}
+$('#tab-med').onclick=()=>setTab('med');
+$('#tab-quiz').onclick=()=>setTab('quiz');
+$('#qimp').onclick=()=>{
+  const d=parseShare($('#qlink').value);
+  if(!d){alert('共有リンクを読み取れませんでした。');return}
+  importShare(d);$('#qlink').value='';quizPrep();
+};
+async function qstart(){
+  if(players.length<2){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
+  const btn=$('#qstart');btn.disabled=true;
+  const need=tracks.filter(t=>!t.title);let n=0;
+  for(let i=0;i<need.length;i+=8){
+    await Promise.all(need.slice(i,i+8).map(t=>
+      fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+t.id))
+        .then(r=>r.json()).then(j=>{t.title=j.title}).catch(()=>{})
+        .finally(()=>{n++;$('#qmsg').textContent='曲名を取得中… '+n+'/'+need.length})));
+  }
+  if(need.length){save();render()}
+  btn.disabled=false;quizPrep();
+  const seen=new Set();qItems=tracks.filter(t=>t.title&&!seen.has(t.title)&&seen.add(t.title));
+  if(qItems.length<2){alert('出題には、曲名が分かる曲が2曲以上必要です。');return}
+  qdur=+$('#qsec').value;qmode=$('#qmode').value;
+  qs=shuf(qItems).slice(0,Math.min(+$('#qn').value||10,qItems.length));qi=0;qscore=0;qlog=[];qOn=true;
+  qshow('qgame');qquestion();
+}
+function qquestion(){
+  const t=qs[qi];qans=false;qlimited=false;qstarted=false;clearTimeout(qtimer);
+  try{P().pauseVideo()}catch(e){}
+  $('#qno').textContent='第'+(qi+1)+'問 / '+qs.length+'　正解 '+qscore;
+  const ch=shuf([t,...shuf(qItems.filter(x=>x!==t)).slice(0,3)]);
+  $('#qch').innerHTML=ch.map(c=>`<button class="choice" data-i="${qItems.indexOf(c)}" disabled>${esc(c.title)}</button>`).join('');
+  $('#qfb').textContent='「▶ 聞く」を押してください。';
+  $('#qnext').hidden=true;$('#qlisten').textContent='▶ 聞く';
+}
+const qNextBtn=()=>{const b=$('#qnext');b.hidden=false;b.textContent=qi+1<qs.length?'次の問題へ':'結果を見る'};
+function quizState(e){
+  if(!qOn)return;
+  if(e.data===1&&qlimited&&!qstarted){qstarted=true;qtimer=setTimeout(()=>{qlimited=false;try{P().pauseVideo()}catch(x){}},qdur*1000)}
+}
+function quizErr(){
+  if(qans)return;
+  qans=true;clearTimeout(qtimer);qlimited=false;qlog.push({t:qs[qi],ok:null});
+  $('#qfb').textContent='この曲は再生できませんでした。';
+  $('#qch').querySelectorAll('.choice').forEach(b=>b.disabled=true);qNextBtn();
+}
+$('#qlisten').onclick=()=>{
+  if(!qOn||qans)return;
+  const t=qs[qi],p=P();
+  clearTimeout(qtimer);qstarted=false;qlimited=true;
+  p.setVolume(100);p.loadVideoById({videoId:t.id,startSeconds:qmode==='intro'?0:t.start});
+  $('#qlisten').textContent='↻ もう一度聞く';$('#qfb').textContent='';
+  $('#qch').querySelectorAll('.choice').forEach(b=>b.disabled=false);
+};
+$('#qch').onclick=e=>{
+  const b=e.target.closest('.choice');if(!b||b.disabled||qans)return;
+  qans=true;qlimited=false;clearTimeout(qtimer);
+  const t=qs[qi],ok=qItems[+b.dataset.i]===t;if(ok)qscore++;
+  $('#qch').querySelectorAll('.choice').forEach(x=>{
+    x.disabled=true;
+    if(qItems[+x.dataset.i]===t)x.classList.add('ok');else if(x===b)x.classList.add('ng');
+  });
+  $('#qfb').textContent=ok?'正解！':'ざんねん。正解は「'+t.title+'」';
+  $('#qno').textContent='第'+(qi+1)+'問 / '+qs.length+'　正解 '+qscore;
+  qlog.push({t,ok});qNextBtn();
+  try{P().playVideo()}catch(x){}
+};
+$('#qnext').onclick=()=>{
+  try{P().pauseVideo()}catch(e){}
+  qi++;
+  if(qi<qs.length){qquestion();return}
+  qOn=false;
+  $('#qscore').textContent=qscore+' / '+qs.length;
+  $('#qrl').innerHTML=qlog.map(r=>`<div class="rl"><b class="${r.ok?'ok':'ng'}">${r.ok===null?'－':r.ok?'○':'×'}</b><span>${esc(r.t.title)}</span></div>`).join('');
+  qshow('qresult');
+};
+$('#qstart').onclick=qstart;
+$('#qagain').onclick=qstart;
+$('#qback').onclick=()=>{qshow('qsetup');quizPrep()};
 
 /* ---- サビ位置の補助 ---- */
 let hold=false,dragging=false;
