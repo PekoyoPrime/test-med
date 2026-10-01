@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>メドレーメーカー</title>
+<style>
+:root{--bg:#e9eef2;--sf:#fff;--ink:#16202b;--mute:#5d6b78;--ac:#0b7a75;--ac-ink:#fff;--hot:#e39b00;--line:#cfd8df}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1a22;--sf:#16252f;--ink:#e6eef3;--mute:#8da0ae;--ac:#3cc3b8;--ac-ink:#06201e;--hot:#f2b93b;--line:#28404e}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 calc(150px + env(safe-area-inset-bottom))}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:8px 0 2px;letter-spacing:.02em}
+h2{font-size:15px;margin:0 0 8px}
+p.sub{margin:0 0 16px;color:var(--mute)}
+section{background:var(--sf);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+textarea,input,select,button{font:inherit;color:inherit}
+textarea,input,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
+textarea{min-height:76px;resize:vertical}
+button{background:var(--ac);color:var(--ac-ink);border:0;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:600}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:400}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.grow{flex:1;min-width:140px}
+.lab{font-size:12px;color:var(--mute);display:block;margin-bottom:2px}
+.warn{background:color-mix(in srgb,var(--hot) 18%,transparent);border-left:4px solid var(--hot);padding:8px 10px;border-radius:4px;margin-bottom:14px;font-size:13px}
+.tr{display:grid;grid-template-columns:40px 1fr;gap:6px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.tr:first-child{border-top:0}
+.tr.on{border-left:4px solid var(--ac);padding-left:8px}
+.tr .go{width:40px;height:40px;padding:0;border-radius:50%}
+.tr .ttl{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:center}
+.tr .ctl{grid-column:2;display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}
+.tr .ctl label{width:78px}
+.tr .ctl button{padding:8px 10px}
+.players{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.players>div{aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden;min-height:112px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--sf);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bar .in{max-width:760px;margin:0 auto}
+#now{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#prog{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:6px 0 8px}
+#prog i{display:block;height:100%;width:0;background:var(--ac)}
+.empty{color:var(--mute);margin:4px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>メドレーメーカー</h1>
+<p class="sub">YouTubeの曲を、好きな位置から好きな長さでつないで再生します。</p>
+<div id="ios" class="warn" hidden>iPhone / iPadでは音量を制御できないため、曲間はフェードせず切り替わります。画面を閉じたりロックすると再生が止まります。</div>
+
+<section>
+  <h2>曲を追加</h2>
+  <label class="lab" for="urls">YouTubeのURLまたは動画ID（1行に1曲）</label>
+  <textarea id="urls" placeholder="https://www.youtube.com/watch?v=..."></textarea>
+  <div class="row"><button id="add">追加</button></div>
+  <details style="margin-top:12px">
+    <summary>プレイリストから読み込む（YouTube Data APIキーが必要）</summary>
+    <div class="row">
+      <div class="grow"><label class="lab" for="key">APIキー</label><input id="key" type="password" autocomplete="off"></div>
+      <div class="grow"><label class="lab" for="pl">プレイリストのURL</label><input id="pl" placeholder="https://www.youtube.com/playlist?list=..."></div>
+    </div>
+    <div class="row"><button id="plgo" class="ghost">読み込む</button></div>
+  </details>
+</section>
+
+<section>
+  <h2>再生設定</h2>
+  <div class="row">
+    <div class="grow"><label class="lab" for="fade">フェード（秒）</label><input id="fade" type="number" min="0" max="8" step="0.5"></div>
+    <div class="grow"><label class="lab" for="ds">新しい曲の開始位置</label><input id="ds" placeholder="0:45"></div>
+    <div class="grow"><label class="lab" for="dl">新しい曲の長さ（15〜60秒）</label><input id="dl" type="number" min="5" max="120"></div>
+  </div>
+  <div class="row"><label><input id="loop" type="checkbox" style="width:auto"> 最後まで行ったら最初に戻る</label></div>
+</section>
+
+<section>
+  <h2>曲リスト</h2>
+  <div id="list"></div>
+</section>
+
+<section>
+  <h2>プレーヤー</h2>
+  <div class="players" id="pbox"></div>
+</section>
+</main>
+
+<div class="bar"><div class="in">
+  <div id="now">停止中</div>
+  <div id="prog"><i></i></div>
+  <div class="row" style="margin:0">
+    <button class="ghost" id="prev" aria-label="前の曲">前へ</button>
+    <button id="pp">再生</button>
+    <button class="ghost" id="next" aria-label="次の曲">次へ</button>
+    <button class="ghost" id="setstart" title="今の再生位置をこの曲の開始位置にします">今の位置を開始に</button>
+  </div>
+</div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const iOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+let tracks=[],S={fade:3,ds:45,dl:30,key:'',loop:true};
+let idx=-1,cur=0,players=[],running=false,armed=false,fading=false,fadeTimer=null;
+
+try{const d=JSON.parse(localStorage.getItem('medley')||'null');if(d){tracks=d.tracks||[];Object.assign(S,d.S||{})}}catch(e){}
+const save=()=>{try{localStorage.setItem('medley',JSON.stringify({tracks,S}))}catch(e){}};
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const parseT=v=>{v=String(v).trim();if(v.includes(':')){const[a,b]=v.split(':');return (+a||0)*60+(+b||0)}return +v||0};
+const vid=s=>{s=s.trim();let m=s.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);if(m)return m[1];return /^[\w-]{11}$/.test(s)?s:null};
+
+if(iOS)$('#ios').hidden=false;
+$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#key').value=S.key;$('#loop').checked=S.loop;
+$('#fade').onchange=e=>{S.fade=Math.min(8,Math.max(0,+e.target.value||0));e.target.value=S.fade;save()};
+$('#ds').onchange=e=>{S.ds=parseT(e.target.value);e.target.value=fmt(S.ds);save()};
+$('#dl').onchange=e=>{S.dl=Math.min(120,Math.max(5,+e.target.value||30));e.target.value=S.dl;save()};
+$('#loop').onchange=e=>{S.loop=e.target.checked;save()};
+
+function render(){
+  const L=$('#list');
+  if(!tracks.length){L.innerHTML='<p class="empty">まだ曲がありません。上のフォームから追加してください。</p>';return}
+  L.innerHTML=tracks.map((t,i)=>`<div class="tr${i===idx?' on':''}" data-i="${i}">
+    <button class="go" data-a="play" aria-label="この曲から再生">▶</button>
+    <div class="ttl">${esc(t.title||t.id)}</div>
+    <div class="ctl">
+      <label><span class="lab">開始</span><input data-f="start" value="${fmt(t.start)}"></label>
+      <label><span class="lab">長さ(秒)</span><input data-f="len" type="number" min="5" max="120" value="${t.len}"></label>
+      <button class="ghost" data-a="up" aria-label="上へ">↑</button>
+      <button class="ghost" data-a="down" aria-label="下へ">↓</button>
+      <button class="ghost" data-a="del" aria-label="削除">削除</button>
+    </div></div>`).join('');
+}
+$('#list').addEventListener('change',e=>{
+  const f=e.target.dataset.f,i=+e.target.closest('.tr').dataset.i;if(!f)return;
+  if(f==='start'){tracks[i].start=parseT(e.target.value);e.target.value=fmt(tracks[i].start)}
+  else{tracks[i].len=Math.min(120,Math.max(5,+e.target.value||30));e.target.value=tracks[i].len}
+  save();
+});
+$('#list').addEventListener('click',e=>{
+  const a=e.target.dataset.a;if(!a)return;const i=+e.target.closest('.tr').dataset.i;
+  if(a==='play'){running=true;cutTo(i)}
+  if(a==='del'){tracks.splice(i,1);if(i<idx)idx--;else if(i===idx){idx=-1}}
+  if(a==='up'&&i>0){[tracks[i-1],tracks[i]]=[tracks[i],tracks[i-1]];if(idx===i)idx--;else if(idx===i-1)idx++}
+  if(a==='down'&&i<tracks.length-1){[tracks[i+1],tracks[i]]=[tracks[i],tracks[i+1]];if(idx===i)idx++;else if(idx===i+1)idx--}
+  save();render();
+});
+
+async function addIds(ids,titles){
+  for(const [n,id] of ids.entries()){
+    const t={id,title:(titles&&titles[n])||'',start:S.ds,len:S.dl};tracks.push(t);
+    if(!t.title)fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id))
+      .then(r=>r.json()).then(j=>{t.title=j.title;save();render()}).catch(()=>{});
+  }
+  save();render();
+}
+$('#add').onclick=()=>{const ids=$('#urls').value.split(/\s+/).map(vid).filter(Boolean);if(ids.length){addIds(ids);$('#urls').value=''}};
+$('#plgo').onclick=async()=>{
+  S.key=$('#key').value.trim();save();
+  const m=$('#pl').value.match(/list=([\w-]+)/),pid=m?m[1]:$('#pl').value.trim();
+  if(!S.key||!pid){alert('APIキーとプレイリストURLを入力してください。');return}
+  try{
+    let tok='',ids=[],tt=[];
+    do{
+      const r=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${pid}&key=${S.key}${tok?'&pageToken='+tok:''}`);
+      const j=await r.json();if(j.error)throw new Error(j.error.message);
+      j.items.forEach(x=>{ids.push(x.snippet.resourceId.videoId);tt.push(x.snippet.title)});
+      tok=j.nextPageToken||'';
+    }while(tok&&ids.length<200);
+    addIds(ids,tt);
+  }catch(err){alert('読み込めませんでした: '+err.message)}
+};
+
+/* ---- player ---- */
+const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
+window.onYouTubeIframeAPIReady=()=>{
+  const n=iOS?1:2;
+  for(let i=0;i<n;i++){
+    $('#pbox').insertAdjacentHTML('beforeend',`<div><div id="p${i}"></div></div>`);
+    players[i]=new YT.Player('p'+i,{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
+      events:{onStateChange:e=>onState(i,e),onError:()=>onErr(i)}});
+  }
+};
+const P=()=>players[cur];
+function cutTo(i){
+  if(!players.length||!tracks[i])return;
+  clearInterval(fadeTimer);fading=false;
+  players.forEach((p,k)=>{if(k!==cur)p.pauseVideo()});
+  idx=i;armed=false;const t=tracks[i];
+  P().setVolume(100);P().loadVideoById({videoId:t.id,startSeconds:t.start});
+  running=true;render();
+}
+function fadeTo(i){
+  const t=tracks[i];if(!t)return;
+  if(iOS||S.fade<=0||fading)return cutTo(i);
+  const from=P(),o=1-cur,to=players[o];
+  idx=i;cur=o;armed=false;fading=true;
+  to.setVolume(0);to.loadVideoById({videoId:t.id,startSeconds:t.start});
+  const t0=Date.now(),ms=S.fade*1000;
+  clearInterval(fadeTimer);
+  fadeTimer=setInterval(()=>{
+    const r=Math.min(1,(Date.now()-t0)/ms);
+    from.setVolume(Math.round(100*(1-r)));to.setVolume(Math.round(100*r));
+    if(r>=1){clearInterval(fadeTimer);from.pauseVideo();fading=false}
+  },80);
+  render();
+}
+function nextIdx(){const n=idx+1;if(n<tracks.length)return n;return S.loop?0:-1}
+function goNext(cut){
+  const n=nextIdx();
+  if(n<0){running=false;P().pauseVideo();setNow('おわり');return}
+  cut?cutTo(n):fadeTo(n);
+}
+function onState(i,e){
+  if(i!==cur)return;
+  if(e.data===1)armed=true;
+  if(e.data===0&&running&&armed){armed=false;goNext(true)}
+  $('#pp').textContent=(e.data===1)?'一時停止':'再生';
+}
+function onErr(i){if(i===cur&&running){setTimeout(()=>goNext(true),500)}}
+function setNow(s){$('#now').textContent=s}
+
+setInterval(()=>{
+  const t=tracks[idx];if(!running||!t||!players.length||!armed||!P().getCurrentTime)return;
+  const rem=t.len-(P().getCurrentTime()-t.start);
+  $('#prog i').style.width=Math.min(100,Math.max(0,100*(1-rem/t.len)))+'%';
+  setNow((idx+1)+'/'+tracks.length+'　'+(t.title||t.id)+'　残り'+Math.max(0,Math.ceil(rem))+'秒');
+  if(rem<=(iOS?0:S.fade)&&!fading)goNext(false);
+},200);
+
+$('#pp').onclick=()=>{
+  if(!players.length){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
+  if(!tracks.length){alert('先に曲を追加してください。');return}
+  if(idx<0||!running){cutTo(idx<0?0:idx);return}
+  P().getPlayerState()===1?P().pauseVideo():P().playVideo();
+};
+$('#next').onclick=()=>{if(tracks.length){running=true;const n=nextIdx();cutTo(n<0?0:n)}};
+$('#prev').onclick=()=>{if(tracks.length){running=true;cutTo(Math.max(0,idx-1))}};
+$('#setstart').onclick=()=>{
+  const t=tracks[idx];if(!t||!players.length)return;
+  t.start=Math.floor(P().getCurrentTime());save();render();
+};
+render();
+</script>
+</body>
+</html>
