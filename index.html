@@ -68,6 +68,11 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 #vsl em{position:absolute;left:17px;width:6px;bottom:8px;border-radius:3px;background:var(--ac)}
 #vsl b{position:absolute;left:12px;width:16px;height:16px;border-radius:50%;background:var(--ink)}
 #volv{font-size:11px;color:var(--mute)}
+.tr{grid-template-columns:40px 88px minmax(0,1fr)}
+.tr .ctl{grid-column:2 / 4}
+.tr .th{width:88px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:var(--line);display:block;align-self:center}
+.tr .ttl{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nowrow{align-items:center}
 </style>
 </head>
 <body>
@@ -122,6 +127,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 
 <section>
   <div class="row" style="margin:0 0 8px;justify-content:space-between"><h2 style="margin:0">曲リスト</h2><button class="ghost" id="clearall">全曲を削除</button></div>
+  <p class="empty" id="listnote" style="font-size:13px;margin:0 0 4px"></p>
   <div id="list"></div>
 </section>
 
@@ -178,7 +184,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 </main>
 
 <div class="bar"><div class="in">
-  <div class="nowrow mc"><span id="nowt">停止中</span><span id="remt"></span></div>
+  <div class="nowrow mc"><img id="nth" alt="" hidden width="48" height="27" style="width:48px;height:27px;object-fit:cover;border-radius:3px;flex:none"><span id="nowt">停止中</span><span id="remt"></span></div>
   <input id="pseek" class="mc" type="range" min="0" max="100" step="0.1" value="0" aria-label="この曲の再生位置">
   <div class="row" style="margin:0">
     <span class="mc row" style="margin:0;gap:8px">
@@ -228,22 +234,25 @@ $('#fade').onchange=e=>{S.fade=Math.min(8,Math.max(0,+e.target.value||0));e.targ
 $('#ds').onchange=e=>{S.ds=parseT(e.target.value);e.target.value=fmt(S.ds);save()};
 $('#dl').onchange=e=>{S.dl=Math.min(120,Math.max(5,+e.target.value||30));e.target.value=S.dl;save()};
 $('#loop').onchange=e=>{S.loop=e.target.checked;save()};
-$('#shuffle').onchange=e=>{S.shuffle=e.target.checked;resetBag();save()};
+$('#shuffle').onchange=e=>{S.shuffle=e.target.checked;resetBag();save();render()};
 
 function render(){
   renderLists();syncLen();
+  if(queue.length!==tracks.length)resetBag();
+  $('#listnote').textContent=S.shuffle&&tracks.length>1?'シャッフル中：再生する順番で表示しています（↑↓で順番を入れ替えられます）':'';
   const L=$('#list');
   if(!tracks.length){L.innerHTML='<p class="empty">まだ曲がありません。上のフォームから追加してください。</p>';return}
-  L.innerHTML=tracks.map((t,i)=>`<div class="tr${i===idx?' on':''}" data-i="${i}">
+  L.innerHTML=queue.map((i,p)=>{const t=tracks[i];return `<div class="tr${i===idx?' on':''}" data-i="${i}" data-p="${p}">
     <button class="go" data-a="play" aria-label="この曲から再生">▶</button>
-    <div class="ttl">${esc(t.title||t.id)}</div>
+    <img class="th" src="https://i.ytimg.com/vi/${t.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="ttl">${S.shuffle?(p+1)+'. ':''}${esc(t.title||t.id)}</div>
     <div class="ctl">
       <label><span class="lab">開始</span><input data-f="start" value="${fmt(t.start)}"></label>
       <label><span class="lab">長さ(秒)</span><input data-f="len" type="number" min="5" max="120" value="${t.len}"></label>
       <button class="ghost" data-a="up" aria-label="上へ">↑</button>
       <button class="ghost" data-a="down" aria-label="下へ">↓</button>
       <button class="ghost" data-a="del" aria-label="削除">削除</button>
-    </div></div>`).join('');
+    </div></div>`}).join('');
 }
 $('#list').addEventListener('change',e=>{
   const f=e.target.dataset.f,i=+e.target.closest('.tr').dataset.i;if(!f)return;
@@ -252,12 +261,26 @@ $('#list').addEventListener('change',e=>{
   save();syncLen();
 });
 $('#list').addEventListener('click',e=>{
-  const a=e.target.dataset.a;if(!a)return;const i=+e.target.closest('.tr').dataset.i;
-  if(a==='play'){running=true;cutTo(i)}
-  if(a==='del'){tracks.splice(i,1);if(i<idx)idx--;else if(i===idx){idx=-1}}
-  if(a==='up'&&i>0){[tracks[i-1],tracks[i]]=[tracks[i],tracks[i-1]];if(idx===i)idx--;else if(idx===i-1)idx++}
-  if(a==='down'&&i<tracks.length-1){[tracks[i+1],tracks[i]]=[tracks[i],tracks[i+1]];if(idx===i)idx++;else if(idx===i+1)idx--}
-  save();resetBag();render();
+  const a=e.target.dataset.a;if(!a)return;
+  const row=e.target.closest('.tr'),i=+row.dataset.i,p=+row.dataset.p;
+  if(a==='play'){running=true;cutTo(i);return}
+  if(a==='del'){
+    if(i===idx)stopAll();
+    tracks.splice(i,1);
+    queue=queue.filter(k=>k!==i).map(k=>k>i?k-1:k);
+    if(i<idx)idx--;
+    nextRound=null;qpos=idx>=0?queue.indexOf(idx):-1;
+  }else if(a==='up'||a==='down'){
+    const d=a==='up'?-1:1;
+    if(S.shuffle){
+      const q=p+d;
+      if(q>=0&&q<queue.length){[queue[p],queue[q]]=[queue[q],queue[p]];nextRound=null;qpos=idx>=0?queue.indexOf(idx):-1}
+    }else{
+      const q=i+d;
+      if(q>=0&&q<tracks.length){[tracks[i],tracks[q]]=[tracks[q],tracks[i]];if(idx===i)idx=q;else if(idx===q)idx=i;qpos=idx>=0?idx:-1}
+    }
+  }
+  save();render();
 });
 
 async function addIds(ids,titles){
@@ -266,7 +289,7 @@ async function addIds(ids,titles){
     if(!t.title)fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id))
       .then(r=>r.json()).then(j=>{t.title=j.title;save();render()}).catch(()=>{});
   }
-  save();resetBag();render();
+  save();fixQueue();render();
 }
 $('#add').onclick=()=>{const ids=$('#urls').value.split(/\s+/).map(vid).filter(Boolean);if(ids.length){addIds(ids);$('#urls').value=''}};
 $('#key').onchange=e=>{S.key=e.target.value.trim();save()};
@@ -318,29 +341,41 @@ window.onYouTubeIframeAPIReady=()=>{
   }
 };
 const P=()=>players[cur];
-let nx=1,pv=2,loaded=[-1,-1,-1],pendingPause=null,noSwap=false,bag=[],nextPick=-1,order=[],pos=-1;
-function resetBag(){bag=tracks.map((_,k)=>k).filter(k=>k!==idx);nextPick=-1;order=idx>=0?[idx]:[];pos=idx>=0?0:-1}
-function used(i){bag=bag.filter(k=>k!==i);nextPick=-1}
-function visit(i,back){
-  if(back&&pos>0&&order[pos-1]===i){pos--;return}
-  if(order[pos+1]===i){pos++;return}
-  order.length=pos+1;order.push(i);pos++;
-  if(order.length>300){order.shift();pos--}
+let nx=1,pv=2,loaded=[-1,-1,-1],pendingPause=null,noSwap=false,queue=[],qpos=-1,nextRound=null;
+function makeQueue(avoid){
+  const a=tracks.map((_,k)=>k);
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+  if(avoid>=0&&a.length>1&&a[0]===avoid)[a[0],a[1]]=[a[1],a[0]];
+  return a;
 }
-function nextIdx(){
-  if(!S.shuffle||tracks.length<2){const n=idx+1;return n<tracks.length?n:(S.loop?0:-1)}
-  if(nextPick>=0&&bag.includes(nextPick))return nextPick;
-  if(!bag.length){if(!S.loop)return -1;bag=tracks.map((_,k)=>k).filter(k=>k!==idx)}
-  return nextPick=bag[Math.floor(Math.random()*bag.length)];
+function resetBag(){
+  if(S.shuffle&&tracks.length>1){
+    queue=makeQueue(-1);
+    if(idx>=0){queue=queue.filter(k=>k!==idx);queue.unshift(idx)}
+  }else queue=tracks.map((_,k)=>k);
+  nextRound=null;qpos=idx>=0?queue.indexOf(idx):-1;
+}
+function fixQueue(){
+  queue=queue.filter(k=>k<tracks.length);
+  const have=new Set(queue);tracks.forEach((_,k)=>{if(!have.has(k))queue.push(k)});
+  nextRound=null;qpos=idx>=0?queue.indexOf(idx):-1;
+}
+function visit(i,back){
+  if(back&&qpos>0&&queue[qpos-1]===i){qpos--;return}
+  if(qpos>=0&&queue[qpos+1]===i){qpos++;return}
+  if(nextRound&&nextRound[0]===i&&qpos===queue.length-1){queue=nextRound;qpos=0;nextRound=null;return}
+  const k=queue.indexOf(i);
+  if(k>=0){qpos=k;return}
+  resetBag();
 }
 function nextTarget(){
-  if(S.shuffle&&tracks.length>1&&pos>=0&&pos<order.length-1)return order[pos+1];
-  return nextIdx();
+  if(qpos<0)return queue.length?queue[0]:-1;
+  if(qpos+1<queue.length)return queue[qpos+1];
+  if(!S.loop)return -1;
+  if(S.shuffle&&tracks.length>1){if(!nextRound)nextRound=makeQueue(idx);return nextRound[0]}
+  return queue[0];
 }
-function prevTarget(){
-  if(S.shuffle&&tracks.length>1)return pos>0?order[pos-1]:-1;
-  return idx>0?idx-1:-1;
-}
+function prevTarget(){return qpos>0?queue[qpos-1]:-1}
 function cueSlot(k,i){
   if(i<0||loaded[k]===i||!tracks[i])return;
   const t=tracks[i];players[k].cueVideoById({videoId:t.id,startSeconds:t.start});loaded[k]=i;
@@ -355,7 +390,7 @@ function cutTo(i,back,noVisit){
   if(players.length<3||!tracks[i])return;
   clearInterval(fadeTimer);fading=false;pendingPause=null;
   players.forEach((p,k)=>{if(k!==cur)p.pauseVideo()});
-  idx=i;armed=false;hold=false;if(!noVisit)visit(i,back);used(i);const t=tracks[i];
+  idx=i;armed=false;hold=false;if(!noVisit)visit(i,back);const t=tracks[i];
   P().setVolume(VOL);P().loadVideoById({videoId:t.id,startSeconds:t.start});loaded[cur]=i;
   running=true;keepAwake();render();
 }
@@ -366,7 +401,7 @@ function fadeTo(i,back){
   const o=(back&&loaded[oP]===i)?oP:(loaded[oN]===i?oN:(loaded[oP]===i?oP:oN));
   const from=players[old],to=players[o];
   if(o===oP){cur=oP;nx=old;pv=oN}else{cur=oN;pv=old;nx=oP}
-  idx=i;armed=false;hold=false;visit(i,back);used(i);
+  idx=i;armed=false;hold=false;visit(i,back);
   to.setVolume(hard?VOL:0);
   if(loaded[o]===i)to.playVideo();else to.loadVideoById({videoId:t.id,startSeconds:t.start});
   loaded[o]=i;loaded[old]=-1;
@@ -410,6 +445,8 @@ setInterval(()=>{
   const el=P().getCurrentTime()-t.start,rem=t.len-el,ps=$('#pseek');
   ps.max=t.len;if(!pdrag)ps.value=Math.min(t.len,Math.max(0,el));
   setNow((hold?'試聴中（自動で切り替わりません）　':(idx+1)+'/'+tracks.length+'　')+(t.title||t.id),'残り'+Math.max(0,Math.ceil(rem))+'秒');
+  const th=$('#nth'),u='https://i.ytimg.com/vi/'+t.id+'/mqdefault.jpg';
+  if(th.dataset.s!==u){th.dataset.s=u;th.src=u}th.hidden=false;
   assistUI(t);
   if(!fading&&!pendingPause)preload();
   const lead=(iOS||S.fade<=0)?1:S.fade;
@@ -423,7 +460,7 @@ function renderLists(){
   $('#lsel').innerHTML=lists.map(l=>`<option value="${l.id}"${l.id===lid?' selected':''}>${esc(l.name)}（${l.tracks.length}曲）</option>`).join('');
 }
 function stopAll(){
-  running=false;qOn=false;clearTimeout(qtimer);clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;loaded=[-1,-1,-1];order=[];pos=-1;
+  running=false;qOn=false;clearTimeout(qtimer);clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;loaded=[-1,-1,-1];qpos=-1;$('#nth').hidden=true;
   players.forEach(p=>{try{p.pauseVideo()}catch(e){}});
   setNow('停止中');$('#pseek').value=0;$('#pp').textContent='再生';
 }
@@ -698,7 +735,7 @@ $('#find').onclick=async()=>{
 $('#pp').onclick=()=>{
   if(players.length<2){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
   if(!tracks.length){alert('先に曲を追加してください。');return}
-  if(idx<0||!running){if(idx<0){resetBag();cutTo(S.shuffle?Math.floor(Math.random()*tracks.length):0)}else cutTo(idx);return}
+  if(idx<0||!running){if(idx<0){if(queue.length!==tracks.length)resetBag();cutTo(queue[0])}else cutTo(idx);return}
   P().getPlayerState()===1?P().pauseVideo():P().playVideo();
 };
 function restartTrack(){const t=tracks[idx];if(!t||!players.length)return;hold=false;P().seekTo(t.start,true);P().playVideo()}
@@ -706,7 +743,7 @@ function step(dir){
   if(!tracks.length)return;
   const was=running&&idx>=0;
   let n=dir>0?nextTarget():prevTarget();
-  if(n<0){if(dir>0)n=0;else{restartTrack();return}}
+  if(n<0){if(dir>0)n=queue[0];else{restartTrack();return}}
   was?fadeTo(n,dir<0):cutTo(n,dir<0);
 }
 $('#next').onclick=()=>step(1);
