@@ -336,7 +336,7 @@ $('#plgo').onclick=async()=>{
 /* ---- player ---- */
 const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
 window.onYouTubeIframeAPIReady=()=>{
-  const n=3;
+  const n=4;
   for(let i=0;i<n;i++){
     $('#pbox').insertAdjacentHTML('beforeend',`<div class="pw" id="pw${i}"><div id="p${i}"></div></div>`);
     players[i]=new YT.Player('p'+i,{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
@@ -345,7 +345,7 @@ window.onYouTubeIframeAPIReady=()=>{
   markRoles();
 };
 const P=()=>players[cur];
-let nx=1,pv=2,loaded=[-1,-1,-1],pendingPause=null,noSwap=false,queue=[],qpos=-1,nextRound=null;
+let nx=1,nn=2,pv=3,loaded=[-1,-1,-1,-1],pendingPause=null,noSwap=false,queue=[],qpos=-1,nextRound=null;
 function makeQueue(avoid){
   const a=tracks.map((_,k)=>k);
   for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
@@ -380,11 +380,23 @@ function nextTarget(){
   return queue[0];
 }
 function prevTarget(){return qpos>0?queue[qpos-1]:-1}
+function nextNextTarget(){
+  if(qpos<0)return queue.length>1?queue[1]:-1;
+  if(qpos+2<queue.length)return queue[qpos+2];
+  if(qpos+1<queue.length){
+    if(!S.loop)return -1;
+    if(S.shuffle&&tracks.length>1){if(!nextRound)nextRound=makeQueue(queue[qpos+1]);return nextRound[0]}
+    return queue[0];
+  }
+  if(!S.loop)return -1;
+  if(S.shuffle&&tracks.length>1){if(!nextRound)nextRound=makeQueue(idx);return nextRound.length>1?nextRound[1]:-1}
+  return queue.length>1?queue[1]:-1;
+}
 function cueSlot(k,i){
   if(i<0||loaded[k]===i||!tracks[i])return;
   const t=tracks[i];players[k].cueVideoById({videoId:t.id,startSeconds:t.start});loaded[k]=i;
 }
-function preload(){cueSlot(nx,nextTarget());cueSlot(pv,prevTarget())}
+function preload(){cueSlot(nx,nextTarget());cueSlot(nn,nextNextTarget());cueSlot(pv,prevTarget())}
 let wl=null;
 async function keepAwake(){
   try{if('wakeLock' in navigator&&!wl){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>{wl=null})}}catch(e){}
@@ -401,10 +413,10 @@ function cutTo(i,back,noVisit){
 function fadeTo(i,back){
   const t=tracks[i];if(!t)return;
   if(noSwap||fading||!running||!armed)return cutTo(i,back);
-  const old=cur,oN=nx,oP=pv,hard=iOS||S.fade<=0;
+  const old=cur,oN=nx,oNN=nn,oP=pv,hard=iOS||S.fade<=0;
   const o=(back&&loaded[oP]===i)?oP:(loaded[oN]===i?oN:(loaded[oP]===i?oP:oN));
   const from=players[old],to=players[o];
-  if(o===oP){cur=oP;nx=old;pv=oN}else{cur=oN;pv=old;nx=oP}
+  if(o===oP){cur=oP;nx=old;nn=oN;pv=oNN}else{cur=oN;nx=oNN;nn=oP;pv=old}
   idx=i;armed=false;hold=false;visit(i,back);
   to.setVolume(hard?VOL:0);
   if(loaded[o]===i)to.playVideo();else to.loadVideoById({videoId:t.id,startSeconds:t.start});
@@ -414,7 +426,7 @@ function fadeTo(i,back){
     setTimeout(()=>{
       if(idx===i&&!armed&&running&&cur===o){
         noSwap=iOS;pendingPause=null;to.pauseVideo();loaded[o]=-1;
-        cur=old;nx=oN;pv=oP;cutTo(i,back,true);
+        cur=old;nx=oN;nn=oNN;pv=oP;cutTo(i,back,true);
       }
     },4500);
   }else{
@@ -464,11 +476,37 @@ setInterval(()=>{
 /* ---- メドレーの保存・切り替え・共有 ---- */
 const b64e=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const b64d=t=>JSON.parse(decodeURIComponent(escape(atob(t.replace(/-/g,'+').replace(/_/g,'/')))));
+const toB64u=a=>{let t='';a.forEach(b=>t+=String.fromCharCode(b));return btoa(t).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+const fromB64u=t=>{t=t.replace(/-/g,'+').replace(/_/g,'/');while(t.length%4)t+='=';return Uint8Array.from(atob(t),c=>c.charCodeAt(0))};
+function packShare(l){
+  if(tracks.length>65535||!tracks.every(t=>toB64u(fromB64u(t.id))===t.id))return null;
+  const nameB=Array.from(new TextEncoder().encode(l.name.slice(0,40))),same=tracks.every(t=>t.len===tracks[0].len);
+  const c=(v,m)=>Math.min(m,Math.max(0,Math.round(+v)||0));
+  const ds=c(S.ds,65535),n=tracks.length,out=[3,(S.loop?1:0)|(S.shuffle?2:0)|(same?4:0),c(S.fade*2,255),ds>>8,ds&255,c(S.dl,255),nameB.length,...nameB,n>>8,n&255];
+  if(same)out.push(c(tracks[0].len,255));
+  tracks.forEach(t=>{const st=c(t.start,65535);out.push(...fromB64u(t.id),st>>8,st&255);if(!same)out.push(c(t.len,255))});
+  return toB64u(out);
+}
+function unpackShare(code){
+  const b=fromB64u(code);if(b[0]!==3)return null;
+  const f=b[1],nl=b[6];let p=7;
+  const name=new TextDecoder().decode(b.slice(p,p+nl));p+=nl;
+  const n=(b[p]<<8)|b[p+1];p+=2;
+  if(!(n<=5000))return null;
+  const all=(f&4)?b[p++]:0,tr=[];
+  for(let k=0;k<n;k++){
+    const id=toB64u(b.slice(p,p+8));p+=8;
+    const st=(b[p]<<8)|b[p+1];p+=2;
+    tr.push([id,st,(f&4)?all:b[p++]]);
+  }
+  if(p>b.length)return null;
+  return [1,name,[b[2]/2,(b[3]<<8)|b[4],b[5],f&1,(f&2)?1:0],tr];
+}
 function renderLists(){
   $('#lsel').innerHTML=lists.map(l=>`<option value="${l.id}"${l.id===lid?' selected':''}>${esc(l.name)}（${l.tracks.length}曲）</option>`).join('');
 }
 function stopAll(){
-  running=false;qOn=false;clearTimeout(qtimer);clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;loaded=[-1,-1,-1];qpos=-1;$('#nth').hidden=true;
+  running=false;qOn=false;clearTimeout(qtimer);clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;loaded=[-1,-1,-1,-1];qpos=-1;$('#nth').hidden=true;
   players.forEach(p=>{try{p.pauseVideo()}catch(e){}});
   setNow('停止中');$('#pseek').value=0;setPP(false);
 }
@@ -502,16 +540,17 @@ function fetchTitle(t){
 $('#lshare').onclick=async()=>{
   sync();const l=curList();
   if(!tracks.length){alert('曲がありません。');return}
-  const code=b64e([1,l.name,[S.fade,S.ds,S.dl,S.loop?1:0,S.shuffle?1:0],tracks.map(t=>[t.id,t.start,t.len])]);
-  const url=location.origin+location.pathname+'#m='+code;
+  const pk=packShare(l);
+  const url=location.origin+location.pathname+(pk?'#s='+pk:'#m='+b64e([1,l.name,[S.fade,S.ds,S.dl,S.loop?1:0,S.shuffle?1:0],tracks.map(t=>[t.id,t.start,t.len])]));
   const box=$('#shareurl');box.value=url;box.hidden=false;
   try{if(navigator.share){await navigator.share({title:'メドレー「'+l.name+'」',url});return}}catch(e){if(e.name==='AbortError')return}
   try{await navigator.clipboard.writeText(url);alert('共有リンクをコピーしました。')}
   catch(e){box.select();alert('下の欄のリンクをコピーして共有してください。')}
 };
 function parseShare(text){
-  const m=String(text).match(/#?m=([\w-]+)/),code=m?m[1]:String(text).trim();
-  try{const d=b64d(code);if(Array.isArray(d)&&(d[0]===1||d[0]===2)&&Array.isArray(d[2])&&Array.isArray(d[3]))return d}catch(e){}
+  const m=String(text).match(/#([ms])=([\w-]+)/),code=m?m[2]:String(text).trim(),kind=m?m[1]:'';
+  if(kind!=='m'){try{const d=unpackShare(code);if(d)return d}catch(e){}}
+  if(kind!=='s'){try{const d=b64d(code);if(Array.isArray(d)&&(d[0]===1||d[0]===2)&&Array.isArray(d[2])&&Array.isArray(d[3]))return d}catch(e){}}
   return null;
 }
 function importShare(d){
@@ -527,7 +566,7 @@ $('#impgo').onclick=()=>{
   importShare(d);$('#imp').value='';
 };
 function handleHash(){
-  if(!location.hash.startsWith('#m='))return;
+  if(!/^#[ms]=/.test(location.hash))return;
   const d=parseShare(location.hash);history.replaceState(null,'',location.pathname+location.search);
   if(d&&confirm('共有されたメドレー「'+d[1]+'」（'+d[3].length+'曲）を取り込みますか？'))importShare(d);
 }
