@@ -121,7 +121,6 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
       <div class="grow"><label class="lab" for="pl">プレイリストのURL</label><input id="pl" placeholder="https://www.youtube.com/playlist?list=..."></div>
     </div>
     <div class="row"><button id="plgo" class="ghost">読み込む</button></div>
-    <div id="tmpbox" hidden style="width:200px;height:113px;margin-top:8px"></div>
     <p class="empty" style="font-size:13px">公開または限定公開のプレイリストが対象です。APIキーを入れると、曲名の取得が速くなり、サビ候補の検索も使えます。</p>
   </details>
 </section>
@@ -160,14 +159,14 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 <div id="t-rel" hidden>
 <section>
   <h2>関連メドレー</h2>
-  <p class="empty" style="font-size:13px;margin:0 0 8px">好きな曲から始めて、その曲に関連する曲を次々に再生します。YouTube Data APIキーが必要です。</p>
-  <label class="lab" for="rkey">APIキー</label>
+  <p class="empty" style="font-size:13px;margin:0 0 8px">好きな曲から始めて、その曲に関連する曲を次々に再生します。「YouTubeのミックス」はAPIキー不要です。それ以外の基準は、YouTube Data APIキーが必要です。</p>
+  <label class="lab" for="rkey">APIキー（ミックス以外で使用）</label>
   <input id="rkey" type="password" autocomplete="off">
-  <label class="lab" for="rseed">最初の曲（動画のURL、または「曲名 アーティスト名」）</label>
-  <input id="rseed" placeholder="https://www.youtube.com/watch?v=… / 曲名 アーティスト名">
+  <label class="lab" for="rseed">最初の曲（動画のURL。ミックス以外では「曲名 アーティスト名」も可）</label>
+  <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
   <div class="row">
     <div class="grow"><label class="lab" for="rmode">関連の基準</label>
-      <select id="rmode"><option value="both">似た曲＋同じアーティスト</option><option value="sim">似た曲（曲名から検索）</option><option value="art">同じアーティスト</option></select></div>
+      <select id="rmode"><option value="mix">YouTubeのミックス（APIキー不要）</option><option value="both">似た曲＋同じアーティスト</option><option value="sim">似た曲（曲名から検索）</option><option value="art">同じアーティスト</option></select></div>
     <div class="grow"><label class="lab" for="rcount">最初に集める曲数</label>
       <select id="rcount"><option>5</option><option selected>8</option><option>12</option><option>20</option></select></div>
   </div>
@@ -219,6 +218,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <h2>プレーヤー</h2>
   <div class="players" id="pbox"></div>
 </section>
+<div id="tmpbox" hidden style="width:200px;height:113px;margin:8px 0 0"></div>
 </main>
 
 <div class="bar"><div class="in">
@@ -248,7 +248,7 @@ let tracks=[],S={fade:3,ds:45,dl:30,key:'',loop:true,shuffle:false};
 let idx=-1,cur=0,players=[],running=false,armed=false,fading=false,fadeTimer=null;
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-const pick=o=>({fade:o.fade,ds:o.ds,dl:o.dl,loop:o.loop,shuffle:o.shuffle,rel:!!o.rel});
+const pick=o=>({fade:o.fade,ds:o.ds,dl:o.dl,loop:o.loop,shuffle:o.shuffle,rel:!!o.rel,mix:!!o.mix});
 let lists=[],lid='';
 try{
   const d=JSON.parse(localStorage.getItem('medley2')||'null');
@@ -549,7 +549,7 @@ function stopAll(){
 function applyS(){$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle;$('#rauto').checked=!!S.rel}
 function loadList(l){
   stopAll();lid=l.id;tracks=l.tracks;
-  S=Object.assign({key:S.key,fade:3,ds:45,dl:30,loop:true,shuffle:false,rel:false},l.S||{});
+  S=Object.assign({key:S.key,fade:3,ds:45,dl:30,loop:true,shuffle:false,rel:false,mix:false},l.S||{});
   applyS();resetBag();render();save();
 }
 function switchTo(id){save();const l=lists.find(x=>x.id===id);if(l)loadList(l)}
@@ -775,7 +775,8 @@ async function gapi(path,params){
   if(j.error){const e=new Error(j.error.message||'APIエラー');e.reason=(j.error.errors&&j.error.errors[0]&&j.error.errors[0].reason)||'';throw e}
   return j;
 }
-const errText=e=>(e.reason==='quotaExceeded'||/quota/i.test(e.message))?'APIの割り当て上限に達しました。しばらく待つか、明日もう一度お試しください。':((e.reason==='keyInvalid'||/API key/i.test(e.message))?'APIキーが正しくありません。':'エラー：'+e.message);
+const errText=e=>e.custom?e.message:((e.reason==='quotaExceeded'||/quota/i.test(e.message))?'APIの割り当て上限に達しました。しばらく待つか、明日もう一度お試しください。':((e.reason==='keyInvalid'||/API key/i.test(e.message))?'APIキーが正しくありません。':'エラー：'+e.message));
+const ce=m=>{const e=new Error(m);e.custom=true;return e};
 const isoSec=s=>{const m=/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(s||'');return m?(+m[1]||0)*3600+(+m[2]||0)*60+(+m[3]||0):0};
 const cleanTitle=t=>{const c=t.replace(/[【\[(（「『].*?[】\])）」』]/g,' ').replace(/\b(official|music video|mv|lyric video|lyrics|feat\.?.*|ft\.?.*)\b/ig,' ').replace(/\s+/g,' ').trim();return c||t};
 const normTitle=t=>cleanTitle(t||'').toLowerCase().replace(/[\s\-–—_/・:：|｜]+/g,'');
@@ -821,16 +822,34 @@ async function fetchRelated(seed,count,mode,known){
   return out;
 }
 $('#rstart').onclick=async()=>{
+  const mix=$('#rmode').value==='mix';
   S.key=($('#rkey').value||S.key||'').trim();$('#key').value=S.key;save();
-  if(!S.key){rmsg('APIキーを入力してください。');return}
+  if(!mix&&!S.key){rmsg('APIキーを入力してください。（キー不要の「YouTubeのミックス」も選べます）');return}
   const text=$('#rseed').value.trim();if(!text){rmsg('最初の曲を入力してください。');return}
   const btn=$('#rstart');btn.disabled=true;rmsg('曲を探しています…');
   try{
-    const seed=await resolveSeed(text),st={fade:3,ds:45,dl:30,loop:false,shuffle:false,rel:true};
-    const first=trackFrom(seed,st);
-    const items=await fetchRelated(seed,+$('#rcount').value,$('#rmode').value,[first]);
-    const l={id:uid(),name:'関連：'+seed.title.slice(0,24),tracks:[first,...items.map(it=>trackFrom(it,st))],S:st};
+    const st={fade:3,ds:45,dl:30,loop:false,shuffle:false,rel:true,mix};
+    let name,trs;
+    if(mix){
+      const id=vid(text);
+      if(!id)throw ce('「YouTubeのミックス」では、動画のURLかIDを入力してください。');
+      let ids;
+      try{ids=await playlistIds('RD'+id)}
+      catch(e){throw ce('YouTubeのミックスを読み込めませんでした。埋め込みでは使えない可能性があります。「関連の基準」を変えて、APIキーを使う方法をお試しください。')}
+      ids=[id,...ids.filter(x=>x!==id&&/^[\w-]{11}$/.test(x))].slice(0,Math.max(2,+$('#rcount').value));
+      if(ids.length<2)throw ce('ミックスから関連曲を取得できませんでした。');
+      const j=await fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id)).then(r=>r.json()).catch(()=>null);
+      name='関連：'+((j&&j.title)?j.title.slice(0,24):id);
+      trs=ids.map(x=>({id:x,title:(x===id&&j&&j.title)||'',start:st.ds,len:st.dl}));
+    }else{
+      const seed=await resolveSeed(text),first=trackFrom(seed,st);
+      const items=await fetchRelated(seed,+$('#rcount').value,$('#rmode').value,[first]);
+      name='関連：'+seed.title.slice(0,24);
+      trs=[first,...items.map(it=>trackFrom(it,st))];
+    }
+    const l={id:uid(),name,tracks:trs,S:st};
     save();lists.push(l);loadList(l);
+    l.tracks.forEach(t=>{if(!t.title)fetchTitle(t)});
     rmsg(l.tracks.length+'曲で開始します。再生が始まらない場合は、下のバーの ▶ を押してください。');
     if(!iOS)cutTo(queue[0]);
   }catch(e){rmsg(errText(e))}
@@ -838,14 +857,20 @@ $('#rstart').onclick=async()=>{
 };
 async function extendRelated(manual){
   if(relBusy)return;
-  if(!tracks.length||!S.key){if(manual)rmsg('曲とAPIキーが必要です。');return}
+  if(!tracks.length||(!S.key&&!S.mix)){if(manual)rmsg('曲とAPIキーが必要です。');return}
   relBusy=true;const target=tracks;
   try{
     rmsg('関連曲を探しています…');
-    const seed=await resolveSeed(target[target.length-1].id);
-    const items=await fetchRelated(seed,manual?8:5,$('#rmode').value,target);
+    let items;
+    if(S.mix){
+      const ids=await playlistIds('RD'+target[target.length-1].id),have=new Set(target.map(t=>t.id));
+      items=ids.filter(x=>/^[\w-]{11}$/.test(x)&&!have.has(x)).slice(0,manual?8:5).map(x=>({id:x,title:'',dur:0}));
+    }else{
+      const seed=await resolveSeed(target[target.length-1].id);
+      items=await fetchRelated(seed,manual?8:5,$('#rmode').value,target);
+    }
     if(!items.length){relNextTry=Date.now()+60000;rmsg('新しい関連曲が見つかりませんでした。');return}
-    items.forEach(it=>target.push(trackFrom(it,S)));
+    items.forEach(it=>{const t=trackFrom(it,S);target.push(t);if(!t.title)fetchTitle(t)});
     save();
     if(target===tracks){fixQueue();render()}
     rmsg(items.length+'曲を追加しました（全'+target.length+'曲）。');
