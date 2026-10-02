@@ -118,6 +118,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <label class="lab" for="urls">YouTubeのURLまたは動画ID（1行に1曲）</label>
   <textarea id="urls" placeholder="https://www.youtube.com/watch?v=..."></textarea>
   <div class="row"><button id="add">追加</button></div>
+  <p class="empty" id="addmsg" style="font-size:13px;margin:6px 0 0"></p>
   <div style="margin-top:12px">
     <label class="lab" for="sq">曲を検索（YouTube／Googleの検索ページを開きます）</label>
     <div class="row" style="margin-top:0"><input class="grow" id="sq" placeholder="曲名 アーティスト名" enterkeyhint="search"></div>
@@ -183,12 +184,12 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 </section>
 <section>
   <h2>曲リストに関連する動画から再生</h2>
-  <p class="empty" style="font-size:13px;margin:0 0 8px">曲リストの曲それぞれの「ミックス」から、関連する曲を集めて再生します。元の曲リストは変わりません。</p>
-  <label class="lab" for="rlink">共有リンク（空欄なら、いまのメドレー）</label>
+  <p class="empty" style="font-size:13px;margin:0 0 8px">曲リストからランダムに10曲を選び、1曲につき2曲ずつ関連曲を集めて再生します。残りの曲は、「自動で追加」や「今すぐ関連曲を追加」で、1曲につき2曲ずつ順番に追加されます。リストの曲を使い切ったら、リストの曲と追加した曲からランダムに選びます。元の曲リストは変わりません。</p>
+  <label class="lab" for="rsrc">元になる曲リスト（メドレー）</label>
+  <select id="rsrc"></select>
+  <label class="lab" for="rlink">または、共有リンクを貼り付け（入力すると、こちらを優先）</label>
   <input id="rlink" placeholder="共有リンクを貼り付け">
-  <div class="row"><div class="grow"><label class="lab" for="rseeds">使う曲数（リストからランダム）</label>
-    <select id="rseeds"><option>5</option><option selected>8</option><option>12</option></select></div>
-    <label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
+  <div class="row"><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
   <div class="row"><button id="rlst">曲リストの関連曲で再生</button></div>
   <p class="empty" id="rmsg" style="margin:8px 0 0"></p>
   <p class="empty" style="font-size:12px;margin:6px 0 0">音楽以外の動画は、曲名・チャンネル名・長さから、できるだけ除いています（完全ではありません）。</p>
@@ -210,7 +211,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
     <div class="row"><input class="grow" id="qlink" placeholder="共有リンクを貼り付け"><button id="qimp" class="ghost">取り込む</button></div>
   </details>
   <label class="lab" for="qmode">出題する場所</label>
-  <select id="qmode"><option value="intro">曲の最初（イントロ）</option><option value="list">リストの開始位置（サビなど）</option></select>
+  <select id="qmode"><option value="intro">曲の最初（イントロ）</option><option value="list">リストの開始位置（サビなど）</option><option value="rel">関連メドレーからエンドレスに出題（曲の最初）</option></select>
   <label class="lab" for="qsec">再生する長さ（秒）</label>
   <select id="qsec"><option>3</option><option selected>5</option><option>8</option><option>10</option><option>15</option><option>30</option></select>
   <label class="lab" for="qn">問題数</label>
@@ -223,7 +224,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <div class="row" style="margin-top:0"><button id="qlisten">▶ 聞く</button></div>
   <div id="qch"></div>
   <p id="qfb"></p>
-  <div class="row"><button id="qnext" hidden>次の問題へ</button></div>
+  <div class="row"><button id="qnext" hidden>次の問題へ</button><button class="ghost" id="qend" hidden>終了して結果を見る</button></div>
 </section>
 <section id="qresult" hidden>
   <h2>結果</h2>
@@ -340,13 +341,16 @@ $('#list').addEventListener('click',e=>{
   save();render();
 });
 
-async function addIds(ids,titles){
-  for(const [n,id] of ids.entries()){
+function addIds(ids,titles){
+  const have=new Set(tracks.map(t=>t.id));let skip=0,add=0;
+  ids.forEach((id,n)=>{
+    if(have.has(id)){skip++;return}
+    have.add(id);add++;
     const t={id,title:(titles&&titles[n])||'',start:S.ds,len:S.dl};tracks.push(t);
-    if(!t.title)fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id))
-      .then(r=>r.json()).then(j=>{t.title=j.title;save();render()}).catch(()=>{});
-  }
+    if(!t.title)fetchTitle(t);
+  });
   save();fixQueue();render();
+  $('#addmsg').textContent=(add?add+'曲を追加しました。':'')+(skip?skip+'曲は追加済みのためスキップしました。':'');
 }
 $('#add').onclick=()=>{const ids=$('#urls').value.split(/\s+/).map(vid).filter(Boolean);if(ids.length){addIds(ids);$('#urls').value=''}};
 let tmpN=0,tmpActive=0;
@@ -519,7 +523,7 @@ setInterval(()=>{
   assistUI(t);
   if(!fading&&!pendingPause)preload();
   if(S.rel)vetCued();
-  if(S.rel&&!relBusy&&Date.now()>relNextTry&&queue.length-1-qpos<=2)extendRelated(false);
+  if(S.rel&&!relBusy&&Date.now()>relNextTry&&queue.length-1-qpos<=3)extendRelated(false);
   const lead=(iOS||S.fade<=0)?1:S.fade;
   if(!hold&&rem<=lead&&!fading)goNext(false);
 },200);
@@ -605,9 +609,9 @@ function parseShare(text){
   return null;
 }
 function importShare(d){
-  const n=x=>+x||0,s=d[2];
+  const n=x=>+x||0,s=d[2],seenI=new Set();
   const l={id:uid(),name:String(d[1]||'共有メドレー').slice(0,40),
-    tracks:d[3].slice(0,200).filter(x=>Array.isArray(x)&&/^[\w-]{11}$/.test(x[0])).map(x=>({id:x[0],title:String(x[3]||'').slice(0,150),start:Math.max(0,n(x[1])),len:Math.min(120,Math.max(5,n(x[2])||30))})),
+    tracks:d[3].slice(0,200).filter(x=>Array.isArray(x)&&/^[\w-]{11}$/.test(x[0])&&!seenI.has(x[0])&&seenI.add(x[0])).map(x=>({id:x[0],title:String(x[3]||'').slice(0,150),start:Math.max(0,n(x[1])),len:Math.min(120,Math.max(5,n(x[2])||30))})),
     S:{fade:Math.min(8,Math.max(0,n(s[0]))),ds:Math.max(0,n(s[1])),dl:Math.min(120,Math.max(5,n(s[2])||30)),loop:!!s[3],shuffle:!!s[4]}};
   save();lists.push(l);loadList(l);l.tracks.filter(t=>!t.title).forEach(fetchTitle);
 }
@@ -630,6 +634,7 @@ $('#clearall').onclick=()=>{
 };
 /* ---- イントロクイズ ---- */
 let qOn=false,qItems=[],qs=[],qi=0,qscore=0,qlog=[],qlimited=false,qstarted=false,qans=false,qtimer=null,qdur=5,qmode='intro';
+let qEndless=false,qrel={src:[],used:[]},qTitles=new Set(),qAsked=new Set(),qBusy=false;
 const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const qshow=id=>['qsetup','qgame','qresult'].forEach(k=>$('#'+k).hidden=k!==id);
 function qInfo(){const l=curList();if(l)$('#qinfo').textContent='現在のメドレー：「'+l.name+'」'+tracks.length+'曲（切り替えは「メドレー」タブで）'}
@@ -673,21 +678,34 @@ async function qstart(){
   if(need.length){save();render()}
   btn.disabled=false;qInfo();
   const seen=new Set();qItems=tracks.filter(t=>t.title&&!seen.has(t.title)&&seen.add(t.title));
-  if(qItems.length<2){alert('出題には、曲名が分かる曲が2曲以上必要です。');return}
-  qdur=+$('#qsec').value;qmode=$('#qmode').value;
-  qs=shuf(qItems).slice(0,Math.min(+$('#qn').value||10,qItems.length));qi=0;qscore=0;qlog=[];qOn=true;
+  qdur=+$('#qsec').value;qmode=$('#qmode').value;qEndless=qmode==='rel';
+  if(qItems.length<(qEndless?1:2)){alert('出題には、曲名が分かる曲が'+(qEndless?'1':'2')+'曲以上必要です。');return}
+  qi=0;qscore=0;qlog=[];qOn=true;
+  if(qEndless){
+    btn.disabled=true;
+    qItems=qItems.map(t=>({id:t.id,title:t.title,start:0}));
+    const l=curList()||{},r=l.rel||{};
+    qrel={src:(r.src||[]).slice(),used:(r.used||[]).slice()};
+    qTitles=new Set(qItems.map(t=>normT(t.title)));qAsked=new Set();
+    for(let g=0;g<3&&qItems.length<4;g++){$('#qmsg').textContent='関連曲を集めています…';await qExtend()}
+    $('#qmsg').textContent='';btn.disabled=false;
+    if(qItems.length<2){alert('関連曲を集められませんでした。');qOn=false;return}
+    qs=[pickEndless()];
+  }else qs=shuf(qItems).slice(0,Math.min(+$('#qn').value||10,qItems.length));
   qshow('qgame');qquestion();
 }
 function qquestion(){
   const t=qs[qi];qans=false;qlimited=false;qstarted=false;clearTimeout(qtimer);
   try{P().pauseVideo()}catch(e){}
-  $('#qno').textContent='第'+(qi+1)+'問 / '+qs.length+'　正解 '+qscore;
+  qHead();
   const ch=shuf([t,...shuf(qItems.filter(x=>x!==t)).slice(0,3)]);
   $('#qch').innerHTML=ch.map(c=>`<button class="choice" data-i="${qItems.indexOf(c)}" disabled>${esc(c.title)}</button>`).join('');
   $('#qfb').textContent='「▶ 聞く」を押してください。';
   $('#qnext').hidden=true;$('#qlisten').textContent='▶ 聞く';
+  $('#qend').hidden=!qEndless;
+  if(qEndless&&qItems.length-qAsked.size<4)qExtend();
 }
-const qNextBtn=()=>{const b=$('#qnext');b.hidden=false;b.textContent=qi+1<qs.length?'次の問題へ':'結果を見る'};
+const qNextBtn=()=>{const b=$('#qnext');b.hidden=false;b.textContent=(qEndless||qi+1<qs.length)?'次の問題へ':'結果を見る'};
 function quizState(e){
   if(!qOn)return;
   if(e.data===1&&qlimited&&!qstarted){qstarted=true;qtimer=setTimeout(()=>{qlimited=false;try{P().pauseVideo()}catch(x){}},qdur*1000)}
@@ -702,7 +720,7 @@ $('#qlisten').onclick=()=>{
   if(!qOn||qans)return;
   const t=qs[qi],p=P();
   clearTimeout(qtimer);qstarted=false;qlimited=true;
-  p.setVolume(VOL);p.loadVideoById({videoId:t.id,startSeconds:qmode==='intro'?0:t.start});
+  p.setVolume(VOL);p.loadVideoById({videoId:t.id,startSeconds:qmode==='list'?t.start:0});
   $('#qlisten').textContent='↻ もう一度聞く';$('#qfb').textContent='';
   $('#qch').querySelectorAll('.choice').forEach(b=>b.disabled=false);
 };
@@ -715,19 +733,48 @@ $('#qch').onclick=e=>{
     if(qItems[+x.dataset.i]===t)x.classList.add('ok');else if(x===b)x.classList.add('ng');
   });
   $('#qfb').textContent=ok?'正解！':'ざんねん。正解は「'+t.title+'」';
-  $('#qno').textContent='第'+(qi+1)+'問 / '+qs.length+'　正解 '+qscore;
+  qHead();
   qlog.push({t,ok});qNextBtn();
   try{P().playVideo()}catch(x){}
 };
+function qHead(){
+  $('#qno').textContent=qEndless?'第'+(qi+1)+'問（エンドレス）　正解 '+qscore:'第'+(qi+1)+'問 / '+qs.length+'　正解 '+qscore;
+}
+function pickEndless(){
+  let c=qItems.filter(t=>!qAsked.has(t.id));
+  if(!c.length){qAsked=new Set();c=qItems.filter(t=>t!==qs[qs.length-1])}
+  const t=c[Math.floor(Math.random()*c.length)]||qItems[0];
+  qAsked.add(t.id);return t;
+}
+async function qExtend(){
+  if(qBusy)return 0;qBusy=true;let added=0;
+  try{
+    const have=new Set(qItems.map(t=>t.id)),excl=new Set([...have,...qrel.src]);
+    for(let a=0;a<4&&!added;a++){
+      const seed=pickSeedFrom(qrel,qItems.map(t=>t.id));
+      (await relatedFromMix(seed,2,excl)).filter(c=>!qTitles.has(normT(c.title))).forEach(c=>{
+        qItems.push({id:c.id,title:c.title,start:0});qTitles.add(normT(c.title));added++;
+      });
+    }
+  }catch(e){}
+  finally{qBusy=false}
+  return added;
+}
+function finishQuiz(){
+  qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}
+  $('#qscore').textContent=qscore+' / '+qlog.length;
+  $('#qrl').innerHTML=qlog.map(r=>`<div class="rl"><b class="${r.ok?'ok':'ng'}">${r.ok===null?'－':r.ok?'○':'×'}</b><span>${esc(r.t.title)}</span></div>`).join('');
+  qshow('qresult');
+}
 $('#qnext').onclick=()=>{
   try{P().pauseVideo()}catch(e){}
   qi++;
+  if(qEndless&&qi>=qs.length)qs.push(pickEndless());
   if(qi<qs.length){qquestion();return}
-  qOn=false;
-  $('#qscore').textContent=qscore+' / '+qs.length;
-  $('#qrl').innerHTML=qlog.map(r=>`<div class="rl"><b class="${r.ok?'ok':'ng'}">${r.ok===null?'－':r.ok?'○':'×'}</b><span>${esc(r.t.title)}</span></div>`).join('');
-  qshow('qresult');
+  finishQuiz();
 };
+$('#qend').onclick=finishQuiz;
+$('#qmode').onchange=()=>{$('#qn').disabled=$('#qmode').value==='rel'};
 $('#qstart').onclick=qstart;
 $('#qagain').onclick=qstart;
 $('#qback').onclick=()=>{qshow('qsetup');quizPrep()};
@@ -814,14 +861,27 @@ async function pool(arr,n,fn){
 }
 async function relatedFromMix(seedId,take,seedSet){
   const all=await playlistIds('RD'+seedId);
-  const ids=all.filter(x=>/^[\w-]{11}$/.test(x)&&!seedSet.has(x)).slice(0,16);
-  const metas=await Promise.all(ids.map(fetchMeta));
-  return ids.map((id,k)=>({id,title:metas[k].title,score:metas[k].ok?musicScore(metas[k].title,metas[k].author):-9,k}))
-    .filter(c=>c.score>=1).sort((a,b)=>b.score-a.score||a.k-b.k).slice(0,take);
+  const ids=all.filter(x=>/^[\w-]{11}$/.test(x)&&!seedSet.has(x)).slice(0,18),cand=[];
+  for(let i=0;i<ids.length;i+=6){
+    const part=ids.slice(i,i+6),metas=await Promise.all(part.map(fetchMeta));
+    part.forEach((id,k)=>{
+      const m=metas[k],sc=m.ok?musicScore(m.title,m.author):-9;
+      if(sc>=1)cand.push({id,title:m.title,score:sc,k:i+k});
+    });
+    if(cand.filter(c=>c.score>=2).length>=take)break;
+  }
+  return cand.sort((a,b)=>b.score-a.score||a.k-b.k).slice(0,take);
 }
-function makeRelList(name,trs){
-  const st={fade:3,ds:45,dl:30,loop:false,shuffle:false,rel:true,mix:true};
-  const l={id:uid(),name,tracks:trs.map(c=>({id:c.id,title:c.title||'',start:st.ds,len:st.dl})),S:st};
+function pickSeedFrom(r,poolIds){
+  const used=new Set(r.used),nxt=r.src.find(id=>!used.has(id));
+  if(nxt){r.used.push(nxt);return nxt}
+  const pool=[...new Set([...r.src,...poolIds])];
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function makeRelList(name,trs,rel){
+  const st={fade:3,ds:45,dl:30,loop:false,shuffle:false,rel:true,mix:true},seen=new Set();
+  trs=trs.filter(c=>!seen.has(c.id)&&seen.add(c.id));
+  const l={id:uid(),name,tracks:trs.map(c=>({id:c.id,title:c.title||'',start:st.ds,len:st.dl})),S:st,rel};
   save();lists.push(l);loadList(l);
   l.tracks.forEach(t=>{if(!t.title)fetchTitle(t)});
   if(!iOS)cutTo(queue[0]);
@@ -834,7 +894,7 @@ $('#rstart').onclick=async()=>{
   try{
     const [items,meta]=await Promise.all([relatedFromMix(id,+$('#rcount').value,new Set([id])),fetchMeta(id)]);
     if(!items.length)throw ce(MIXFAIL);
-    const l=makeRelList('関連：'+(meta.title||id).slice(0,24),[{id,title:meta.title||''},...items]);
+    const l=makeRelList('関連：'+(meta.title||id).slice(0,24),[{id,title:meta.title||''},...items],{src:[id],used:[id]});
     rmsg(l.tracks.length+'曲で開始します。再生が始まらない場合は、下のバーの ▶ を押してください。');
   }catch(e){rmsg(e.custom?e.message:MIXFAIL)}
   finally{btn.disabled=false}
@@ -844,41 +904,49 @@ $('#rlst').onclick=async()=>{
   if(txt){
     const d=parseShare(txt);if(!d){rmsg('共有リンクを読み取れませんでした。');return}
     ids=d[3].map(x=>x[0]);name=d[1]||'共有メドレー';
-  }else{ids=tracks.map(t=>t.id);name=(curList()||{}).name||'メドレー'}
+  }else{
+    const l=lists.find(x=>x.id===$('#rsrc').value)||curList();
+    ids=l.tracks.map(t=>t.id);name=l.name;
+  }
   ids=[...new Set(ids.filter(x=>/^[\w-]{11}$/.test(x)))];
   if(!ids.length){rmsg('曲リストが空です。');return}
-  const seeds=shuf(ids).slice(0,+$('#rseeds').value),seedSet=new Set(ids);
+  const seeds=shuf(ids).slice(0,10),seedSet=new Set(ids);
   const btn=$('#rlst');btn.disabled=true;let done=0;rmsg('関連曲を探しています… 0/'+seeds.length);
   try{
-    const groups=(await pool(seeds,3,async id=>{const r=await relatedFromMix(id,3,seedSet);rmsg('関連曲を探しています… '+(++done)+'/'+seeds.length);return r})).filter(a=>a&&a.length);
+    const groups=(await pool(seeds,3,async id=>{
+      const r=await relatedFromMix(id,2,seedSet);
+      rmsg('関連曲を探しています… '+(++done)+'/'+seeds.length);return r;
+    })).filter(a=>a&&a.length);
     const items=[],seen=new Set(),titles=new Set();
-    for(let k=0;items.length<40;k++){
-      let any=false;
-      for(const a of groups)if(k<a.length){
-        any=true;const c=a[k],nt=normT(c.title);
-        if(!seen.has(c.id)&&!titles.has(nt)){seen.add(c.id);titles.add(nt);items.push(c)}
-      }
-      if(!any)break;
+    for(let k=0;k<2;k++)for(const a of groups)if(k<a.length){
+      const c=a[k],nt=normT(c.title);
+      if(!seen.has(c.id)&&!titles.has(nt)){seen.add(c.id);titles.add(nt);items.push(c)}
     }
     if(!items.length)throw ce(MIXFAIL);
     const trs=$('#rinc').checked?shuf(items.concat(seeds.map(id=>({id,title:''})))):items;
-    const l=makeRelList('関連：'+name.slice(0,24),trs);
+    const l=makeRelList('関連：'+name.replace(/^関連：/,'').slice(0,24),trs,{src:ids,used:seeds.slice()});
     rmsg(l.tracks.length+'曲で開始します。再生が始まらない場合は、下のバーの ▶ を押してください。');
   }catch(e){rmsg(e.custom?e.message:MIXFAIL)}
   finally{btn.disabled=false}
 };
 async function extendRelated(manual){
   if(relBusy||!tracks.length)return;
-  relBusy=true;const target=tracks;
+  relBusy=true;const target=tracks,l=curList();
   try{
     rmsg('関連曲を探しています…');
-    const have=new Set(target.map(t=>t.id)),last=target[target.length-1];
-    const items=await relatedFromMix(last.id,manual?8:5,have);
-    if(!items.length){relNextTry=Date.now()+60000;rmsg('新しい関連曲が見つかりませんでした。');return}
-    items.forEach(c=>target.push({id:c.id,title:c.title,start:S.ds,len:S.dl}));
+    const r=l?(l.rel||(l.rel={src:[],used:[]})):{src:[],used:[]};
+    const have=new Set(target.map(t=>t.id)),titles=new Set(target.map(t=>normT(t.title)).filter(Boolean));
+    const excl=new Set([...have,...r.src]);
+    let got=[];
+    for(let a=0;a<4&&!got.length;a++){
+      const seed=pickSeedFrom(r,target.map(t=>t.id));
+      got=(await relatedFromMix(seed,2,excl)).filter(c=>!titles.has(normT(c.title)));
+    }
+    if(!got.length){relNextTry=Date.now()+60000;rmsg('新しい関連曲が見つかりませんでした。');return}
+    got.forEach(c=>target.push({id:c.id,title:c.title,start:S.ds,len:S.dl}));
     save();
     if(target===tracks){fixQueue();render()}
-    rmsg(items.length+'曲を追加しました（全'+target.length+'曲）。');
+    rmsg(got.length+'曲を追加しました（全'+target.length+'曲）。');
   }catch(e){relNextTry=Date.now()+60000;rmsg('関連曲を取得できませんでした。')}
   finally{relBusy=false}
 }
@@ -915,7 +983,13 @@ function vetCued(){
     if(badDur(d))removeTrack(i);
   });
 }
+function renderSrc(){
+  const sel=$('#rsrc'),prev=sel.value;
+  sel.innerHTML=lists.map(l=>`<option value="${l.id}">${esc(l.name)}（${l.tracks.length}曲）</option>`).join('');
+  sel.value=lists.some(l=>l.id===prev)?prev:lid;
+}
 function renderRel(){
+  renderSrc();
   const l=curList();
   $('#rinfo').textContent=l?'現在のメドレー：「'+l.name+'」'+tracks.length+'曲':'';
   $('#rauto').checked=!!S.rel;
