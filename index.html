@@ -77,6 +77,12 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 .bar button.ico.ghost{border:0}
 .players>.pw{min-height:0}
 .players>.pw.cur{grid-column:1/-1;order:-1}
+.tab{font-size:13px;padding:10px 4px}
+.rr{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:8px;padding:6px 0;border-top:1px solid var(--line);align-items:center}
+.rr.on{border-left:4px solid var(--ac);padding-left:6px}
+.rr img{width:88px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:var(--line);display:block}
+.rr div{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rr button{width:40px;height:40px;padding:0}
 </style>
 </head>
 <body>
@@ -87,6 +93,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 
 <div id="tabs" class="row" role="tablist" style="margin:0 0 14px">
   <button class="tab" id="tab-med" role="tab" aria-selected="true">メドレー</button>
+  <button class="tab" id="tab-rel" role="tab" aria-selected="false">関連メドレー</button>
   <button class="tab" id="tab-quiz" role="tab" aria-selected="false">イントロクイズ</button>
 </div>
 <div id="t-med">
@@ -94,8 +101,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <h2>メドレー</h2>
   <select id="lsel" aria-label="メドレーを切り替え"></select>
   <div class="row"><button class="ghost" id="lnew">新規</button><button class="ghost" id="lren">名前変更</button><button class="ghost" id="ldup">複製</button><button class="ghost" id="ldel">削除</button></div>
-  <div class="row"><button id="lshare">共有リンクを作る</button><button id="lshort" class="ghost">短縮リンクを作る</button></div>
-  <p class="empty" style="font-size:13px;margin:6px 0 0">短縮リンクは外部サービス（is.gd）を使います。リンクの内容（曲のID、開始位置など）が is.gd に送られます。</p>
+  <div class="row"><button id="lshare">共有リンクを作る</button></div>
   <input id="shareurl" readonly hidden style="margin-top:8px" aria-label="共有リンク">
   <details style="margin-top:12px"><summary>共有リンクから取り込む</summary>
     <div class="row"><input class="grow" id="imp" placeholder="共有リンクを貼り付け"><button id="impgo" class="ghost">取り込む</button></div>
@@ -148,6 +154,33 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <div class="row"><span class="lab" style="margin:0">この曲の長さ（秒）</span><button class="ghost" id="lenm5">−5</button><button class="ghost" id="lenm">−1</button><input id="alen" type="number" min="5" max="120" style="width:84px" aria-label="この曲の長さ"><button class="ghost" id="lenp">＋1</button><button class="ghost" id="lenp5">＋5</button></div>
   <div class="row"><button id="find">コメントと概要欄から候補を探す</button><button id="setstart2">今の位置を開始に</button></div>
   <div class="row" id="cands"></div>
+</section>
+</div>
+
+<div id="t-rel" hidden>
+<section>
+  <h2>関連メドレー</h2>
+  <p class="empty" style="font-size:13px;margin:0 0 8px">好きな曲から始めて、その曲に関連する曲を次々に再生します。YouTube Data APIキーが必要です。</p>
+  <label class="lab" for="rkey">APIキー</label>
+  <input id="rkey" type="password" autocomplete="off">
+  <label class="lab" for="rseed">最初の曲（動画のURL、または「曲名 アーティスト名」）</label>
+  <input id="rseed" placeholder="https://www.youtube.com/watch?v=… / 曲名 アーティスト名">
+  <div class="row">
+    <div class="grow"><label class="lab" for="rmode">関連の基準</label>
+      <select id="rmode"><option value="both">似た曲＋同じアーティスト</option><option value="sim">似た曲（曲名から検索）</option><option value="art">同じアーティスト</option></select></div>
+    <div class="grow"><label class="lab" for="rcount">最初に集める曲数</label>
+      <select id="rcount"><option>5</option><option selected>8</option><option>12</option><option>20</option></select></div>
+  </div>
+  <div class="row"><button id="rstart">関連メドレーを作って再生</button></div>
+  <p class="empty" id="rmsg" style="margin:8px 0 0"></p>
+  <p class="empty" style="font-size:12px;margin:6px 0 0">関連曲は、曲名やアーティストからの検索結果です（YouTubeの「関連動画」そのものではありません）。検索1回あたり約100ポイントのAPI割り当てを使います（1日1万ポイント）。開始位置・長さ・フェードは、「メドレー」タブで変えられます。</p>
+</section>
+<section>
+  <h2>いまのメドレー</h2>
+  <p class="empty" id="rinfo" style="margin:0 0 6px"></p>
+  <label><input id="rauto" type="checkbox" style="width:auto"> 曲が残り少なくなったら、関連曲を自動で追加する</label>
+  <div class="row"><button class="ghost" id="rmore">今すぐ関連曲を追加</button></div>
+  <div id="rlist"></div>
 </section>
 </div>
 
@@ -215,7 +248,7 @@ let tracks=[],S={fade:3,ds:45,dl:30,key:'',loop:true,shuffle:false};
 let idx=-1,cur=0,players=[],running=false,armed=false,fading=false,fadeTimer=null;
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-const pick=o=>({fade:o.fade,ds:o.ds,dl:o.dl,loop:o.loop,shuffle:o.shuffle});
+const pick=o=>({fade:o.fade,ds:o.ds,dl:o.dl,loop:o.loop,shuffle:o.shuffle,rel:!!o.rel});
 let lists=[],lid='';
 try{
   const d=JSON.parse(localStorage.getItem('medley2')||'null');
@@ -243,6 +276,7 @@ $('#shuffle').onchange=e=>{S.shuffle=e.target.checked;resetBag();save();render()
 function render(){
   renderLists();syncLen();markRoles();
   if(queue.length!==tracks.length)resetBag();
+  renderRel();
   $('#listnote').textContent=S.shuffle&&tracks.length>1?'シャッフル中：再生する順番で表示しています（↑↓で順番を入れ替えられます）':'';
   const L=$('#list');
   if(!tracks.length){L.innerHTML='<p class="empty">まだ曲がありません。上のフォームから追加してください。</p>';return}
@@ -470,6 +504,7 @@ setInterval(()=>{
   if(th.dataset.s!==u){th.dataset.s=u;th.src=u}th.hidden=false;
   assistUI(t);
   if(!fading&&!pendingPause)preload();
+  if(S.rel&&!relBusy&&Date.now()>relNextTry&&queue.length-1-qpos<=2)extendRelated(false);
   const lead=(iOS||S.fade<=0)?1:S.fade;
   if(!hold&&rem<=lead&&!fading)goNext(false);
 },200);
@@ -511,10 +546,10 @@ function stopAll(){
   players.forEach(p=>{try{p.pauseVideo()}catch(e){}});
   setNow('停止中');$('#pseek').value=0;setPP(false);
 }
-function applyS(){$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle}
+function applyS(){$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle;$('#rauto').checked=!!S.rel}
 function loadList(l){
   stopAll();lid=l.id;tracks=l.tracks;
-  S=Object.assign({key:S.key,fade:3,ds:45,dl:30,loop:true,shuffle:false},l.S||{});
+  S=Object.assign({key:S.key,fade:3,ds:45,dl:30,loop:true,shuffle:false,rel:false},l.S||{});
   applyS();resetBag();render();save();
 }
 function switchTo(id){save();const l=lists.find(x=>x.id===id);if(l)loadList(l)}
@@ -547,32 +582,6 @@ $('#lshare').onclick=async()=>{
   try{if(navigator.share){await navigator.share({title:'メドレー「'+l.name+'」',url});return}}catch(e){if(e.name==='AbortError')return}
   try{await navigator.clipboard.writeText(url);alert('共有リンクをコピーしました。')}
   catch(e){box.select();alert('下の欄のリンクをコピーして共有してください。')}
-};
-function shortenUrl(url){
-  return new Promise((res,rej)=>{
-    const cb='isgd_'+Math.random().toString(36).slice(2),sc=document.createElement('script');
-    const done=(f,v)=>{clearTimeout(to);delete window[cb];sc.remove();f(v)};
-    const to=setTimeout(()=>done(rej,new Error('時間切れです')),10000);
-    window[cb]=j=>j&&j.shorturl?done(res,j.shorturl):done(rej,new Error((j&&j.errormessage)||'短縮できませんでした'));
-    sc.onerror=()=>done(rej,new Error('短縮サービスに接続できませんでした'));
-    sc.src='https://is.gd/create.php?format=json&callback='+cb+'&url='+encodeURIComponent(url);
-    document.head.appendChild(sc);
-  });
-}
-$('#lshort').onclick=async()=>{
-  sync();const l=curList();
-  if(!tracks.length){alert('曲がありません。');return}
-  const pk=packShare(l);
-  const url=location.origin+location.pathname+(pk?'#s='+pk:'#m='+b64e([1,l.name,[S.fade,S.ds,S.dl,S.loop?1:0,S.shuffle?1:0],tracks.map(t=>[t.id,t.start,t.len])]));
-  const btn=$('#lshort');btn.disabled=true;btn.textContent='短縮中…';
-  try{
-    const short=await shortenUrl(url);
-    const box=$('#shareurl');box.value=short;box.hidden=false;
-    try{if(navigator.share){await navigator.share({title:'メドレー「'+l.name+'」',url:short});return}}catch(e){if(e.name==='AbortError')return}
-    try{await navigator.clipboard.writeText(short);alert('短縮リンクをコピーしました。')}
-    catch(e){box.select();alert('下の欄のリンクをコピーして共有してください。')}
-  }catch(err){alert('短縮できませんでした: '+err.message+'\n通常の共有リンクを使ってください。')}
-  finally{btn.disabled=false;btn.textContent='短縮リンクを作る'}
 };
 function parseShare(text){
   const m=String(text).match(/#([ms])=([\w-]+)/),code=m?m[2]:String(text).trim(),kind=m?m[1]:'';
@@ -616,16 +625,20 @@ function quizPrep(){
   $('#qmsg').textContent=max<2?'クイズには2曲以上必要です。「メドレー」タブで曲を追加するか、共有リンクを取り込んでください。':(max<4?'4曲未満のため、選択肢は'+max+'つになります。':'');
   qInfo();
 }
+let curTab='med';
 function setTab(t){
   const q=t==='quiz';
   if(q){stopAll();qshow('qsetup');quizPrep()}
-  else{qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
-  $('#t-med').hidden=q;$('#t-quiz').hidden=!q;
+  else if(curTab==='quiz'){qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
+  if(t==='rel'){$('#rkey').value=S.key||'';renderRel()}
+  curTab=t;
+  $('#t-med').hidden=t!=='med';$('#t-rel').hidden=t!=='rel';$('#t-quiz').hidden=!q;
   document.body.classList.toggle('q',q);
-  $('#tab-med').setAttribute('aria-selected',String(!q));$('#tab-quiz').setAttribute('aria-selected',String(q));
+  ['med','rel','quiz'].forEach(k=>$('#tab-'+k).setAttribute('aria-selected',String(k===t)));
   window.scrollTo(0,0);
 }
 $('#tab-med').onclick=()=>setTab('med');
+$('#tab-rel').onclick=()=>setTab('rel');
 $('#tab-quiz').onclick=()=>setTab('quiz');
 $('#qimp').onclick=()=>{
   const d=parseShare($('#qlink').value);
@@ -752,6 +765,106 @@ function syncLen(){
   $('#atitle').textContent=t.title||t.id;
   if(document.activeElement!==a)a.value=t.len;
 }
+
+/* ---- 関連メドレー ---- */
+let relBusy=false,relNextTry=0;
+const rmsg=t=>{$('#rmsg').textContent=t};
+async function gapi(path,params){
+  const r=await fetch('https://www.googleapis.com/youtube/v3/'+path+'?'+new URLSearchParams({...params,key:S.key}));
+  const j=await r.json();
+  if(j.error){const e=new Error(j.error.message||'APIエラー');e.reason=(j.error.errors&&j.error.errors[0]&&j.error.errors[0].reason)||'';throw e}
+  return j;
+}
+const errText=e=>(e.reason==='quotaExceeded'||/quota/i.test(e.message))?'APIの割り当て上限に達しました。しばらく待つか、明日もう一度お試しください。':((e.reason==='keyInvalid'||/API key/i.test(e.message))?'APIキーが正しくありません。':'エラー：'+e.message);
+const isoSec=s=>{const m=/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(s||'');return m?(+m[1]||0)*3600+(+m[2]||0)*60+(+m[3]||0):0};
+const cleanTitle=t=>{const c=t.replace(/[【\[(（「『].*?[】\])）」』]/g,' ').replace(/\b(official|music video|mv|lyric video|lyrics|feat\.?.*|ft\.?.*)\b/ig,' ').replace(/\s+/g,' ').trim();return c||t};
+const normTitle=t=>cleanTitle(t||'').toLowerCase().replace(/[\s\-–—_/・:：|｜]+/g,'');
+async function resolveSeed(text){
+  let id=vid(text);
+  if(!id){
+    const r=await gapi('search',{part:'snippet',type:'video',videoCategoryId:'10',maxResults:'1',q:text});
+    id=r.items&&r.items[0]&&r.items[0].id.videoId;
+    if(!id)throw new Error('曲が見つかりませんでした');
+  }
+  const v=await gapi('videos',{part:'snippet,contentDetails,status',id});
+  const x=v.items&&v.items[0];if(!x)throw new Error('動画が見つかりませんでした');
+  return {id,title:x.snippet.title,channelId:x.snippet.channelId,dur:isoSec(x.contentDetails.duration)};
+}
+function trackFrom(it,st){
+  const room=it.dur>0?it.dur-st.dl-10:st.ds;
+  return {id:it.id,title:it.title,start:Math.max(0,Math.min(st.ds,room)),len:st.dl};
+}
+async function fetchRelated(seed,count,mode,known){
+  const base={part:'snippet',type:'video',videoEmbeddable:'true',maxResults:'25'},jobs=[];
+  if(mode!=='art')jobs.push(gapi('search',{...base,videoCategoryId:'10',q:cleanTitle(seed.title)}));
+  if(mode!=='sim'&&seed.channelId)jobs.push(gapi('search',{...base,channelId:seed.channelId,order:'viewCount'}));
+  const res=await Promise.all(jobs);
+  const lists2=res.map(r=>(r.items||[]).map(x=>x.id&&x.id.videoId).filter(Boolean));
+  const seen=new Set(known.map(t=>t.id).concat(seed.id)),ids=[];
+  for(let k=0;ids.length<50;k++){
+    let any=false;
+    for(const L of lists2)if(k<L.length){any=true;const id=L[k];if(!seen.has(id)){seen.add(id);ids.push(id)}}
+    if(!any)break;
+  }
+  if(!ids.length)return [];
+  const v=await gapi('videos',{part:'snippet,contentDetails,status',id:ids.slice(0,50).join(',')});
+  const by={};(v.items||[]).forEach(x=>by[x.id]=x);
+  const titles=new Set(known.map(t=>normTitle(t.title)).concat(normTitle(seed.title)).filter(Boolean)),out=[];
+  for(const id of ids){
+    const x=by[id];if(!x)continue;
+    const d=isoSec(x.contentDetails.duration);
+    if(!x.status.embeddable||x.status.privacyStatus!=='public'||x.snippet.liveBroadcastContent!=='none'||d<60||d>600)continue;
+    const nt=normTitle(x.snippet.title);if(titles.has(nt))continue;titles.add(nt);
+    out.push({id,title:x.snippet.title,dur:d});
+    if(out.length>=count)break;
+  }
+  return out;
+}
+$('#rstart').onclick=async()=>{
+  S.key=($('#rkey').value||S.key||'').trim();$('#key').value=S.key;save();
+  if(!S.key){rmsg('APIキーを入力してください。');return}
+  const text=$('#rseed').value.trim();if(!text){rmsg('最初の曲を入力してください。');return}
+  const btn=$('#rstart');btn.disabled=true;rmsg('曲を探しています…');
+  try{
+    const seed=await resolveSeed(text),st={fade:3,ds:45,dl:30,loop:false,shuffle:false,rel:true};
+    const first=trackFrom(seed,st);
+    const items=await fetchRelated(seed,+$('#rcount').value,$('#rmode').value,[first]);
+    const l={id:uid(),name:'関連：'+seed.title.slice(0,24),tracks:[first,...items.map(it=>trackFrom(it,st))],S:st};
+    save();lists.push(l);loadList(l);
+    rmsg(l.tracks.length+'曲で開始します。再生が始まらない場合は、下のバーの ▶ を押してください。');
+    if(!iOS)cutTo(queue[0]);
+  }catch(e){rmsg(errText(e))}
+  finally{btn.disabled=false}
+};
+async function extendRelated(manual){
+  if(relBusy)return;
+  if(!tracks.length||!S.key){if(manual)rmsg('曲とAPIキーが必要です。');return}
+  relBusy=true;const target=tracks;
+  try{
+    rmsg('関連曲を探しています…');
+    const seed=await resolveSeed(target[target.length-1].id);
+    const items=await fetchRelated(seed,manual?8:5,$('#rmode').value,target);
+    if(!items.length){relNextTry=Date.now()+60000;rmsg('新しい関連曲が見つかりませんでした。');return}
+    items.forEach(it=>target.push(trackFrom(it,S)));
+    save();
+    if(target===tracks){fixQueue();render()}
+    rmsg(items.length+'曲を追加しました（全'+target.length+'曲）。');
+  }catch(e){relNextTry=Date.now()+60000;rmsg(errText(e))}
+  finally{relBusy=false}
+}
+$('#rmore').onclick=()=>extendRelated(true);
+$('#rauto').onchange=e=>{S.rel=e.target.checked;save()};
+function renderRel(){
+  const l=curList();
+  $('#rinfo').textContent=l?'現在のメドレー：「'+l.name+'」'+tracks.length+'曲':'';
+  $('#rauto').checked=!!S.rel;
+  $('#rlist').innerHTML=tracks.length?queue.map(i=>{const t=tracks[i];
+    return `<div class="rr${i===idx?' on':''}" data-i="${i}"><img src="https://i.ytimg.com/vi/${t.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div>${esc(t.title||t.id)}</div><button class="ghost" data-a="rplay" aria-label="この曲から再生">▶</button></div>`}).join(''):'<p class="empty">まだ曲がありません。</p>';
+}
+$('#rlist').addEventListener('click',e=>{
+  const b=e.target.closest('[data-a="rplay"]');if(!b)return;
+  running=true;cutTo(+b.closest('.rr').dataset.i);
+});
 
 /* ---- サビ位置の補助 ---- */
 let hold=false,dragging=false;
