@@ -66,6 +66,11 @@ body.q #psec{margin-top:110vh}
   <button class="tab" id="tab-med" role="tab" aria-selected="true">メドレー</button>
   <button class="tab" id="tab-quiz" role="tab" aria-selected="false">イントロクイズ</button>
 </div>
+<div class="row" id="volrow" style="margin:0 0 14px">
+  <label class="lab" for="vol" style="margin:0">音量</label>
+  <input id="vol" type="range" min="0" max="100" step="1" value="100" class="grow" style="padding:0;border:0;background:none">
+  <span id="volv" class="lab" style="margin:0"></span>
+</div>
 <div id="t-med">
 <section>
   <h2>メドレー</h2>
@@ -124,6 +129,7 @@ body.q #psec{margin-top:110vh}
     <span class="lab" style="margin:0">曲の何割あたりへ</span>
     <button class="ghost" data-p="20">20%</button><button class="ghost" data-p="35">35%</button><button class="ghost" data-p="50">50%</button><button class="ghost" data-p="65">65%</button><button class="ghost" data-p="80">80%</button>
   </div>
+  <div class="row"><span class="lab" style="margin:0">この曲の長さ（秒）</span><button class="ghost" id="lenm">−5</button><input id="alen" type="number" min="5" max="120" style="width:84px" aria-label="この曲の長さ"><button class="ghost" id="lenp">＋5</button></div>
   <div class="row"><button id="find">コメントと概要欄から候補を探す</button><button id="setstart2">ここを開始に</button></div>
   <div class="row" id="cands"></div>
 </section>
@@ -320,7 +326,7 @@ function cutTo(i){
   clearInterval(fadeTimer);fading=false;pendingPause=null;
   players.forEach((p,k)=>{if(k!==cur)p.pauseVideo()});
   idx=i;armed=false;hold=false;used(i);const t=tracks[i];
-  P().setVolume(100);P().loadVideoById({videoId:t.id,startSeconds:t.start});
+  P().setVolume(VOL);P().loadVideoById({videoId:t.id,startSeconds:t.start});
   running=true;keepAwake();render();
 }
 function fadeTo(i){
@@ -328,7 +334,7 @@ function fadeTo(i){
   if(noSwap||fading)return cutTo(i);
   const from=P(),o=1-cur,to=players[o],hard=iOS||S.fade<=0;
   idx=i;cur=o;armed=false;hold=false;used(i);
-  to.setVolume(hard?100:0);
+  to.setVolume(hard?VOL:0);
   if(preId===i)to.playVideo();else to.loadVideoById({videoId:t.id,startSeconds:t.start});
   preId=-1;
   if(hard){
@@ -339,7 +345,7 @@ function fadeTo(i){
     clearInterval(fadeTimer);
     fadeTimer=setInterval(()=>{
       const r=Math.min(1,(Date.now()-t0)/ms);
-      from.setVolume(Math.round(100*(1-r)));to.setVolume(Math.round(100*r));
+      from.setVolume(Math.round(VOL*(1-r)));to.setVolume(Math.round(VOL*r));
       if(r>=1){clearInterval(fadeTimer);from.pauseVideo();fading=false}
     },80);
   }
@@ -454,7 +460,8 @@ const qshow=id=>['qsetup','qgame','qresult'].forEach(k=>$('#'+k).hidden=k!==id);
 function qInfo(){const l=curList();if(l)$('#qinfo').textContent='現在のメドレー：「'+l.name+'」'+tracks.length+'曲（切り替えは「メドレー」タブで）'}
 function quizPrep(){
   const max=tracks.length,opts=[5,10,20,50].filter(v=>v<max);if(max>=2)opts.push(max);
-  $('#qn').innerHTML=opts.map(v=>`<option value="${v}"${v===Math.min(10,max)?' selected':''}>${v===max?'全部（'+v+'問）':v+'問'}</option>`).join('');
+  const prev=+$('#qn').value,def=opts.includes(prev)?prev:Math.min(10,max);
+  $('#qn').innerHTML=opts.map(v=>`<option value="${v}"${v===def?' selected':''}>${v===max?'全部（'+v+'問）':v+'問'}</option>`).join('');
   $('#qmsg').textContent=max<2?'クイズには2曲以上必要です。「メドレー」タブで曲を追加するか、共有リンクを取り込んでください。':(max<4?'4曲未満のため、選択肢は'+max+'つになります。':'');
   qInfo();
 }
@@ -485,7 +492,7 @@ async function qstart(){
         .finally(()=>{n++;$('#qmsg').textContent='曲名を取得中… '+n+'/'+need.length})));
   }
   if(need.length){save();render()}
-  btn.disabled=false;quizPrep();
+  btn.disabled=false;qInfo();
   const seen=new Set();qItems=tracks.filter(t=>t.title&&!seen.has(t.title)&&seen.add(t.title));
   if(qItems.length<2){alert('出題には、曲名が分かる曲が2曲以上必要です。');return}
   qdur=+$('#qsec').value;qmode=$('#qmode').value;
@@ -516,7 +523,7 @@ $('#qlisten').onclick=()=>{
   if(!qOn||qans)return;
   const t=qs[qi],p=P();
   clearTimeout(qtimer);qstarted=false;qlimited=true;
-  p.setVolume(100);p.loadVideoById({videoId:t.id,startSeconds:qmode==='intro'?0:t.start});
+  p.setVolume(VOL);p.loadVideoById({videoId:t.id,startSeconds:qmode==='intro'?0:t.start});
   $('#qlisten').textContent='↻ もう一度聞く';$('#qfb').textContent='';
   $('#qch').querySelectorAll('.choice').forEach(b=>b.disabled=false);
 };
@@ -546,11 +553,24 @@ $('#qstart').onclick=qstart;
 $('#qagain').onclick=qstart;
 $('#qback').onclick=()=>{qshow('qsetup');quizPrep()};
 
+/* ---- 音量 ---- */
+let VOL=100;
+try{const v=localStorage.getItem('medley-vol');if(v!==null)VOL=Math.min(100,Math.max(0,+v||0))}catch(e){}
+$('#vol').value=VOL;
+if(iOS){$('#vol').disabled=true;$('#volv').textContent='iPhoneでは本体の音量ボタンを使ってください'}
+else $('#volv').textContent=VOL+'%';
+$('#vol').oninput=e=>{
+  VOL=+e.target.value;$('#volv').textContent=VOL+'%';
+  try{localStorage.setItem('medley-vol',VOL)}catch(x){}
+  if(!fading&&players.length){try{P().setVolume(VOL)}catch(x){}}
+};
+
 /* ---- サビ位置の補助 ---- */
 let hold=false,dragging=false;
 function assistUI(t){
   const d=P().getDuration?P().getDuration():0,c=P().getCurrentTime();
   $('#atitle').textContent=t.title||t.id;
+  if(document.activeElement!==$('#alen'))$('#alen').value=t.len;
   const sk=$('#seek');if(d>0){sk.max=Math.floor(d);if(!dragging)sk.value=Math.floor(c)}
   if(!dragging)$('#pos').textContent=fmt(c)+' / '+fmt(d)+'　（開始位置 '+fmt(t.start)+'）';
   if(hold)setNow('試聴中（自動で切り替わりません）　'+(t.title||t.id));
@@ -565,6 +585,10 @@ document.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{if(idx>=0&&armed
 document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const d=idx>=0?P().getDuration():0;if(d)jump(d*b.dataset.p/100)});
 $('#setstart2').onclick=()=>$('#setstart').click();
 $('#cands').onclick=e=>{const v=e.target.dataset.c;if(v)jump(+v-2)};
+const setLen=v=>{const t=tracks[idx];if(!t)return;t.len=Math.min(120,Math.max(5,Math.round(v)||30));$('#alen').value=t.len;save();render()};
+$('#alen').onchange=e=>setLen(+e.target.value);
+$('#lenm').onclick=()=>{if(tracks[idx])setLen(tracks[idx].len-5)};
+$('#lenp').onclick=()=>{if(tracks[idx])setLen(tracks[idx].len+5)};
 
 const stamps=txt=>{const o=[],re=/(?:(\d{1,2}):)?(\d{1,2}):(\d{2})/g;let m;while((m=re.exec(txt)))o.push((+(m[1]||0))*3600+(+m[2])*60+(+m[3]));return o};
 $('#find').onclick=async()=>{
