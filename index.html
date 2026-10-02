@@ -94,7 +94,8 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <h2>メドレー</h2>
   <select id="lsel" aria-label="メドレーを切り替え"></select>
   <div class="row"><button class="ghost" id="lnew">新規</button><button class="ghost" id="lren">名前変更</button><button class="ghost" id="ldup">複製</button><button class="ghost" id="ldel">削除</button></div>
-  <div class="row"><button id="lshare">共有リンクを作る</button></div>
+  <div class="row"><button id="lshare">共有リンクを作る</button><button id="lshort" class="ghost">短縮リンクを作る</button></div>
+  <p class="empty" style="font-size:13px;margin:6px 0 0">短縮リンクは外部サービス（is.gd）を使います。リンクの内容（曲のID、開始位置など）が is.gd に送られます。</p>
   <input id="shareurl" readonly hidden style="margin-top:8px" aria-label="共有リンク">
   <details style="margin-top:12px"><summary>共有リンクから取り込む</summary>
     <div class="row"><input class="grow" id="imp" placeholder="共有リンクを貼り付け"><button id="impgo" class="ghost">取り込む</button></div>
@@ -546,6 +547,32 @@ $('#lshare').onclick=async()=>{
   try{if(navigator.share){await navigator.share({title:'メドレー「'+l.name+'」',url});return}}catch(e){if(e.name==='AbortError')return}
   try{await navigator.clipboard.writeText(url);alert('共有リンクをコピーしました。')}
   catch(e){box.select();alert('下の欄のリンクをコピーして共有してください。')}
+};
+function shortenUrl(url){
+  return new Promise((res,rej)=>{
+    const cb='isgd_'+Math.random().toString(36).slice(2),sc=document.createElement('script');
+    const done=(f,v)=>{clearTimeout(to);delete window[cb];sc.remove();f(v)};
+    const to=setTimeout(()=>done(rej,new Error('時間切れです')),10000);
+    window[cb]=j=>j&&j.shorturl?done(res,j.shorturl):done(rej,new Error((j&&j.errormessage)||'短縮できませんでした'));
+    sc.onerror=()=>done(rej,new Error('短縮サービスに接続できませんでした'));
+    sc.src='https://is.gd/create.php?format=json&callback='+cb+'&url='+encodeURIComponent(url);
+    document.head.appendChild(sc);
+  });
+}
+$('#lshort').onclick=async()=>{
+  sync();const l=curList();
+  if(!tracks.length){alert('曲がありません。');return}
+  const pk=packShare(l);
+  const url=location.origin+location.pathname+(pk?'#s='+pk:'#m='+b64e([1,l.name,[S.fade,S.ds,S.dl,S.loop?1:0,S.shuffle?1:0],tracks.map(t=>[t.id,t.start,t.len])]));
+  const btn=$('#lshort');btn.disabled=true;btn.textContent='短縮中…';
+  try{
+    const short=await shortenUrl(url);
+    const box=$('#shareurl');box.value=short;box.hidden=false;
+    try{if(navigator.share){await navigator.share({title:'メドレー「'+l.name+'」',url:short});return}}catch(e){if(e.name==='AbortError')return}
+    try{await navigator.clipboard.writeText(short);alert('短縮リンクをコピーしました。')}
+    catch(e){box.select();alert('下の欄のリンクをコピーして共有してください。')}
+  }catch(err){alert('短縮できませんでした: '+err.message+'\n通常の共有リンクを使ってください。')}
+  finally{btn.disabled=false;btn.textContent='短縮リンクを作る'}
 };
 function parseShare(text){
   const m=String(text).match(/#([ms])=([\w-]+)/),code=m?m[2]:String(text).trim(),kind=m?m[1]:'';
