@@ -93,30 +93,76 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 .pvt{font-weight:600;overflow-wrap:anywhere}
 .cse-added{background:#e3f6ea!important;outline:2px solid #1c8a4a}
 .cse-badge{color:#1c8a4a;font-weight:700;padding:2px 0}
+:root{--bg:#030303;--sf:#121212;--ink:#fff;--mute:#aaa;--ac:#fff;--ac-ink:#030303;--hot:#ffd34d;--line:#2b2b2b;--ok:#4ed08a;--ng:#ff7b7b;--sidew:240px;--barh:130px}
+body{padding:0;background:var(--bg);color:var(--ink)}
+#side{position:fixed;left:0;top:0;bottom:var(--barh);width:var(--sidew);z-index:50;display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top)) 8px 8px;background:var(--bg);border-right:1px solid var(--line)}
+#side .brand{font-weight:700;font-size:18px;padding:6px 12px 14px}
+#side nav{display:flex;flex-direction:column;gap:2px}
+#side .tab{flex:none;text-align:left;border:0;border-radius:10px;padding:12px;font-size:15px;font-weight:600;background:transparent;color:var(--ink)}
+#side .tab:hover{background:#181818}
+#side .tab[aria-selected=true]{background:#2a2a2a;color:var(--ink);border:0}
+#lnew{margin:14px 6px 0;background:#272727;border:0;border-radius:20px;padding:10px 14px;font-weight:600;color:var(--ink)}
+#plist{flex:1;min-height:0;overflow-y:auto;margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}
+.pl{display:block;width:100%;text-align:left;background:transparent;color:var(--ink);border:0;border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px;margin:0}
+.pl span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .pls{font-size:12px;color:var(--mute);font-weight:400}
+.pl:hover{background:#181818}
+.pl.on{background:#222}
+#content{margin-left:var(--sidew)}
+#topbar{position:fixed;top:0;left:var(--sidew);right:0;z-index:40;display:flex;gap:10px;align-items:center;padding:calc(8px + env(safe-area-inset-top)) 16px 8px;background:var(--bg);border-bottom:1px solid var(--line)}
+#menu{display:none;width:40px;height:40px;padding:0;border:0;font-size:20px;align-items:center;justify-content:center}
+#sbox{position:relative;flex:1;max-width:640px;margin:0 auto}
+#sq{width:100%;height:40px;padding:0 38px;border-radius:8px;background:#121212;border:1px solid #3a3a3a;color:var(--ink);-webkit-appearance:none;appearance:none}
+#sgo{position:absolute;left:2px;top:0;width:38px;height:40px;padding:0;background:transparent;border:0;color:var(--mute);display:flex;align-items:center;justify-content:center}
+#sclr{position:absolute;right:2px;top:0;width:38px;height:40px;padding:0;background:transparent;border:0;color:var(--mute);font-size:22px}
+main{max-width:920px;padding:calc(72px + env(safe-area-inset-top)) 16px calc(var(--barh) + 40px + env(safe-area-inset-bottom))}
+#scrim{display:none}
+.bar{z-index:30}
+#toast{bottom:calc(var(--barh) + 12px + env(safe-area-inset-bottom))}
+@media (max-width:899px){
+  :root{--sidew:0px}
+  #side{width:280px;bottom:0;transform:translateX(-100%);transition:transform .2s}
+  body.side-open #side{transform:none}
+  body.side-open #scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:45}
+  #menu{display:inline-flex}
+}
 </style>
 </head>
 <body>
+<div id="app">
+<aside id="side">
+  <div class="brand">♪ メドレーメーカー</div>
+  <nav id="tabs" role="tablist">
+    <button class="tab" id="tab-med" role="tab" aria-selected="true">🎵 メドレー</button>
+    <button class="tab" id="tab-rel" role="tab" aria-selected="false">🔗 関連メドレー</button>
+    <button class="tab" id="tab-quiz" role="tab" aria-selected="false">❓ イントロクイズ</button>
+  </nav>
+  <button id="lnew" class="ghost">＋ 新しいメドレー</button>
+  <div id="plist"></div>
+</aside>
+<div id="scrim"></div>
+<div id="content">
+<header id="topbar">
+  <button id="menu" class="ghost" aria-label="メニュー">☰</button>
+  <div id="sbox">
+    <button id="sgo" aria-label="検索"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg></button>
+    <input id="sq" type="search" placeholder="曲名、アーティストで検索" enterkeyhint="search" autocomplete="off">
+    <button id="sclr" aria-label="クリア" hidden>×</button>
+  </div>
+</header>
 <main>
-<h1>メドレーメーカー</h1>
-<p class="sub">YouTubeの曲を、好きな位置から好きな長さでつないで再生します。</p>
 <div id="ios" class="warn" hidden>iPhone / iPadでは音量を制御できないため、曲間はフェードせず切り替わります。次の曲を先読みして待ち時間を短くしています（ブロックされた場合は自動で通常の切り替えに戻ります）。画面をロックすると再生が止まります。</div>
-
-<div id="tabs" class="row" role="tablist" style="margin:0 0 14px">
-  <button class="tab" id="tab-med" role="tab" aria-selected="true">メドレー</button>
-  <button class="tab" id="tab-rel" role="tab" aria-selected="false">関連メドレー</button>
-  <button class="tab" id="tab-quiz" role="tab" aria-selected="false">イントロクイズ</button>
-</div>
 <div id="t-med">
 <section>
-  <h2>メドレー</h2>
-  <select id="lsel" aria-label="メドレーを切り替え"></select>
-  <div class="row"><button class="ghost" id="lnew">新規</button><button class="ghost" id="lren">名前変更</button><button class="ghost" id="ldup">複製</button><button class="ghost" id="ldel">削除</button></div>
-  <div class="row"><button id="lshare">共有リンクを作る</button></div>
+  <div class="lab" style="margin:0">いまのメドレー</div>
+  <h2 id="curname" style="margin:2px 0 0;font-size:22px"></h2>
+  <div class="empty" id="curmeta" style="margin:0 0 6px"></div>
+  <div class="row"><button class="ghost" id="lren">名前変更</button><button class="ghost" id="ldup">複製</button><button class="ghost" id="ldel">削除</button><button id="lshare">共有リンクを作る</button></div>
   <input id="shareurl" readonly hidden style="margin-top:8px" aria-label="共有リンク">
   <details style="margin-top:12px"><summary>共有リンクから取り込む</summary>
     <div class="row"><input class="grow" id="imp" placeholder="共有リンクを貼り付け"><button id="impgo" class="ghost">取り込む</button></div>
   </details>
-  <p class="empty" style="font-size:13px">曲・開始位置・長さ・再生設定をまとめて、この端末に自動保存します。</p>
+  <p class="empty" style="font-size:13px;margin:8px 0 0">曲・開始位置・長さ・再生設定をまとめて、この端末に自動保存します。左のリストで切り替えます。</p>
 </section>
 
 <section>
@@ -125,24 +171,6 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <textarea id="urls" placeholder="https://www.youtube.com/watch?v=..."></textarea>
   <div class="row"><button id="add">追加</button></div>
   <p class="empty" id="addmsg" style="font-size:13px;margin:6px 0 0"></p>
-  <div style="margin-top:12px">
-    <label class="lab" for="sq">曲を検索（YouTube／Googleの検索ページを開きます）</label>
-    <div class="row" style="margin-top:0"><input class="grow" id="sq" placeholder="曲名 アーティスト名" enterkeyhint="search"></div>
-    <div class="row"><button class="ghost" id="syt">YouTubeで検索を開く</button><button class="ghost" id="sgg">Googleで検索を開く</button></div>
-    <p class="empty" style="font-size:12px;margin:6px 0 0">見つけた動画のURLを、上のURL欄に貼り付けて追加してください。</p>
-  </div>
-  <details id="gdet" style="margin-top:12px">
-    <summary>Google検索で探して追加（APIキー不要）</summary>
-    <p class="empty" style="font-size:13px;margin:8px 0 0">検索結果の動画をタップすると、プレビューして、メドレーに追加できます。</p>
-    <div id="pvpanel" hidden>
-      <div class="pvt" id="pvt"></div>
-      <div id="pvbox"><div id="pvp"></div></div>
-      <div class="row"><button id="pvplay">▶ 開始位置から試聴</button><button class="ghost" id="pvhead">最初から</button><button class="ghost" id="pvstop">■ 停止</button></div>
-      <div class="row"><button id="pvadd">＋ メドレーに追加</button></div>
-    </div>
-    <p class="empty" id="gmsg" style="margin:6px 0 0"></p>
-    <div id="gcse"></div>
-  </details>
   <details style="margin-top:12px">
     <summary>プレイリストから読み込む（APIキー不要）</summary>
     <div class="row">
@@ -181,6 +209,21 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
   <div class="row"><span class="lab" style="margin:0">この曲の長さ（秒）</span><button class="ghost" id="lenm5">−5</button><button class="ghost" id="lenm">−1</button><input id="alen" type="number" min="5" max="120" style="width:84px" aria-label="この曲の長さ"><button class="ghost" id="lenp">＋1</button><button class="ghost" id="lenp5">＋5</button></div>
   <div class="row"><button id="setstart2">今の位置を開始に</button></div>
 </section>
+</div>
+
+<div id="t-search" hidden>
+<section>
+  <h2 id="sqhead">検索結果</h2>
+  <p class="empty" style="font-size:13px;margin:0">動画をタップすると、プレビューして、メドレーに追加できます。</p>
+  <div id="pvpanel" hidden>
+    <div class="pvt" id="pvt"></div>
+    <div id="pvbox"><div id="pvp"></div></div>
+    <div class="row"><button id="pvplay">▶ 開始位置から試聴</button><button class="ghost" id="pvhead">最初から</button><button class="ghost" id="pvstop">■ 停止</button></div>
+    <div class="row"><button id="pvadd">＋ メドレーに追加</button></div>
+  </div>
+  <p class="empty" id="gmsg" style="margin:6px 0 0"></p>
+</section>
+<div id="gcse"></div>
 </div>
 
 <div id="t-rel" hidden>
@@ -249,6 +292,8 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 </section>
 <div id="tmpbox" hidden style="margin:8px 0 0"></div>
 </main>
+</div>
+</div>
 
 <div id="toast" hidden role="status" aria-live="polite"></div>
 <div class="bar"><div class="in">
@@ -570,7 +615,10 @@ function unpackShare(code){
   return [1,name,[b[2]/2,(b[3]<<8)|b[4],b[5],f&1,(f&2)?1:0],tr];
 }
 function renderLists(){
-  $('#lsel').innerHTML=lists.map(l=>`<option value="${l.id}"${l.id===lid?' selected':''}>${esc(l.name)}（${l.tracks.length}曲）</option>`).join('');
+  $('#plist').innerHTML=lists.map(l=>`<button class="pl${l.id===lid?' on':''}" data-id="${l.id}"><span>${esc(l.name)}</span><span class="pls">${l.tracks.length}曲${l.rel?'・関連':''}</span></button>`).join('');
+  const l=lists.find(x=>x.id===lid);
+  $('#curname').textContent=l?l.name:'';
+  $('#curmeta').textContent=l?l.tracks.length+'曲':'';
 }
 function stopAll(){
   running=false;qOn=false;clearTimeout(qtimer);clearInterval(fadeTimer);fading=false;pendingPause=null;armed=false;hold=false;idx=-1;loaded=[-1,-1,-1,-1];qpos=-1;$('#nth').hidden=true;
@@ -585,7 +633,6 @@ function loadList(l){
 }
 function switchTo(id){save();const l=lists.find(x=>x.id===id);if(l)loadList(l)}
 const curList=()=>lists.find(x=>x.id===lid);
-$('#lsel').onchange=e=>switchTo(e.target.value);
 $('#lnew').onclick=()=>{
   const n=prompt('新しいメドレーの名前','メドレー'+(lists.length+1));if(!n)return;
   save();const l={id:uid(),name:n.slice(0,40),tracks:[],S:{fade:3,ds:45,dl:30,loop:true,shuffle:false}};lists.push(l);loadList(l);
@@ -665,8 +712,8 @@ function setTab(t){
   else if(curTab==='quiz'){qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
   if(t==='rel')renderRel();
   curTab=t;
-  $('#t-med').hidden=t!=='med';$('#t-rel').hidden=t!=='rel';$('#t-quiz').hidden=!q;
-  document.body.classList.toggle('q',q);
+  $('#t-med').hidden=t!=='med';$('#t-rel').hidden=t!=='rel';$('#t-quiz').hidden=!q;$('#t-search').hidden=t!=='search';
+  document.body.classList.toggle('q',q);document.body.classList.remove('side-open');
   ['med','rel','quiz'].forEach(k=>$('#tab-'+k).setAttribute('aria-selected',String(k===t)));
   window.scrollTo(0,0);
 }
@@ -1032,26 +1079,58 @@ $('#rlist').addEventListener('click',e=>{
   running=true;cutTo(+b.closest('.rr').dataset.i);
 });
 
-/* ---- 検索ページを開く ---- */
-$('#syt').onclick=()=>window.open('https://www.youtube.com/results?search_query='+encodeURIComponent($('#sq').value.trim()),'_blank','noopener');
-$('#sq').addEventListener('keydown',e=>{if(e.key==='Enter')$('#syt').click()});
-
-/* ---- Google検索（APIキー不要）・プレビュー・追加 ---- */
+/* ---- 検索（Googleカスタム検索）・プレビュー・追加 ---- */
 const CSE_ID='f0875449847e94ae8';
-let cseLoaded=false,toastT=null;
+let cseLoaded=false,cseReady=false,pendingQ=null,toastT=null;
 const gmsg=t=>{$('#gmsg').textContent=t};
 function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2800)}
+function anchorId(a){
+  let u=a.getAttribute('data-ctorig')||a.getAttribute('href')||'';
+  try{const x=new URL(u);if(/google\./.test(x.hostname))u=x.searchParams.get('url')||x.searchParams.get('q')||u}catch(_){}
+  return vid(u);
+}
+function markAdded(el){
+  if(!el||el.querySelector('.cse-badge'))return;
+  el.classList.add('cse-added');el.insertAdjacentHTML('afterbegin','<div class="cse-badge">✓ 追加済み</div>');
+}
+function markAllAdded(){
+  document.querySelectorAll('#gcse a.gs-title').forEach(a=>{
+    const id=anchorId(a);if(id&&tracks.some(t=>t.id===id))markAdded(a.closest('.gsc-webResult,.gsc-result'));
+  });
+}
+function execSearch(q){
+  try{google.search.cse.element.getElement('medley').execute(q)}catch(e){gmsg('検索を実行できませんでした。')}
+}
 function loadCse(){
   if(cseLoaded)return;cseLoaded=true;
-  window.__gcse={parsetags:'explicit',callback:()=>{
-    try{google.search.cse.element.render({div:'gcse',tag:'search',attributes:{linkTarget:'_blank'}})}catch(e){gmsg('検索ボックスを表示できませんでした。')}
-  }};
+  window.__gcse={parsetags:'explicit',
+    callback:()=>{
+      try{
+        google.search.cse.element.render({div:'gcse',tag:'searchresults-only',gname:'medley',attributes:{linkTarget:'_blank',enableHistory:false}});
+        cseReady=true;if(pendingQ){const q=pendingQ;pendingQ=null;execSearch(q)}
+      }catch(e){gmsg('検索を表示できませんでした。')}
+    },
+    searchCallbacks:{web:{rendered:()=>{gmsg('');markAllAdded()}}}};
   const sc=document.createElement('script');
   sc.src='https://cse.google.com/cse.js?cx='+CSE_ID;sc.async=true;
   sc.onerror=()=>gmsg('Googleの検索を読み込めませんでした。');
   document.head.appendChild(sc);
 }
-$('#gdet').addEventListener('toggle',()=>{if($('#gdet').open)loadCse()});
+function doSearch(q){
+  if(!q)return;
+  setTab('search');
+  $('#sqhead').textContent='「'+q+'」の検索結果';gmsg('検索中…');
+  $('#sq').blur();
+  if(!cseLoaded){pendingQ=q;loadCse()}
+  else if(cseReady)execSearch(q);
+  else pendingQ=q;
+}
+$('#sq').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();doSearch($('#sq').value.trim())}
+});
+$('#sgo').onclick=()=>doSearch($('#sq').value.trim());
+$('#sq').addEventListener('input',()=>{$('#sclr').hidden=!$('#sq').value});
+$('#sclr').onclick=()=>{$('#sq').value='';$('#sclr').hidden=true;$('#sq').focus()};
 
 let pvs=null,pvPlayer=null,pvReady=false,pvPend=null,pvLimited=false,pvStarted=false,pvTimer=null;
 function pvEnsure(){
@@ -1079,10 +1158,6 @@ function updatePvAdd(){
   const has=!!pvs&&tracks.some(t=>t.id===pvs.id),b=$('#pvadd');
   b.textContent=has?'✓ 追加済み':'＋ メドレーに追加';b.disabled=has;
 }
-function markAdded(el){
-  if(!el||el.querySelector('.cse-badge'))return;
-  el.classList.add('cse-added');el.insertAdjacentHTML('afterbegin','<div class="cse-badge">✓ 追加済み</div>');
-}
 $('#pvplay').onclick=()=>pvPlay(S.ds);
 $('#pvhead').onclick=()=>pvPlay(0);
 $('#pvstop').onclick=pvStop;
@@ -1096,9 +1171,7 @@ $('#pvadd').onclick=()=>{
 };
 $('#gcse').addEventListener('click',e=>{
   const a=e.target.closest('a');if(!a)return;
-  let u=a.getAttribute('data-ctorig')||a.getAttribute('href')||'';
-  try{const x=new URL(u);if(/google\./.test(x.hostname))u=x.searchParams.get('url')||x.searchParams.get('q')||u}catch(_){}
-  const id=vid(u);if(!id)return;
+  const id=anchorId(a);if(!id)return;
   e.preventDefault();e.stopPropagation();
   const title=(a.textContent||'').replace(/\s*[-–|]\s*YouTube\s*$/i,'').trim();
   pvStop();
@@ -1108,7 +1181,19 @@ $('#gcse').addEventListener('click',e=>{
   if(tracks.some(t=>t.id===id))markAdded(pvs.el);
   $('#pvpanel').scrollIntoView({behavior:'smooth',block:'nearest'});
 },true);
-$('#sgg').onclick=()=>window.open('https://www.google.com/search?q='+encodeURIComponent($('#sq').value.trim()+' site:youtube.com'),'_blank','noopener');
+
+/* ---- サイドバー ---- */
+$('#plist').addEventListener('click',e=>{
+  const b=e.target.closest('.pl');if(!b)return;
+  if(b.dataset.id!==lid)switchTo(b.dataset.id);
+  setTab('med');
+});
+$('#menu').onclick=()=>document.body.classList.toggle('side-open');
+$('#scrim').onclick=()=>document.body.classList.remove('side-open');
+const barEl=document.querySelector('.bar');
+const setBarH=()=>document.documentElement.style.setProperty('--barh',barEl.offsetHeight+'px');
+try{new ResizeObserver(setBarH).observe(barEl)}catch(e){}
+setBarH();
 
 /* ---- サビ位置の補助 ---- */
 let hold=false,dragging=false;
