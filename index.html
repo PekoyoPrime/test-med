@@ -87,6 +87,12 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 .rr .stt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600}
 .rr .scn{display:block;font-size:12px;color:var(--mute)}
 #gcse{background:#fff;color:#000;border-radius:6px;margin-top:8px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));max-width:90vw;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:20px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:60;text-align:center}
+#pvpanel{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px}
+#pvbox{width:100%;max-width:360px;aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden;margin:6px 0}
+.pvt{font-weight:600;overflow-wrap:anywhere}
+.cse-added{background:#e3f6ea!important;outline:2px solid #1c8a4a}
+.cse-badge{color:#1c8a4a;font-weight:700;padding:2px 0}
 </style>
 </head>
 <body>
@@ -125,10 +131,15 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
     <div class="row"><button class="ghost" id="syt">YouTubeで検索を開く</button><button class="ghost" id="sgg">Googleで検索を開く</button></div>
     <p class="empty" style="font-size:12px;margin:6px 0 0">見つけた動画のURLを、上のURL欄に貼り付けて追加してください。</p>
   </div>
-  <details style="margin-top:12px">
+  <details id="gdet" style="margin-top:12px">
     <summary>Google検索で探して追加（APIキー不要）</summary>
-    <p class="empty" style="font-size:13px;margin:8px 0 0">初回だけ、Googleの<a href="https://programmablesearchengine.google.com/" target="_blank" rel="noopener">プログラム可能な検索エンジン</a>（無料）で検索エンジンを作り、「検索するサイト」に <b>youtube.com/watch*</b> を指定して、検索エンジンID（cx）を下に貼り付けてください。検索結果の動画をタップすると、リストに追加されます。</p>
-    <div class="row"><input class="grow" id="cx" placeholder="検索エンジンID（cx）" autocomplete="off"><button class="ghost" id="cxsave">保存して読み込む</button></div>
+    <p class="empty" style="font-size:13px;margin:8px 0 0">検索結果の動画をタップすると、プレビューして、メドレーに追加できます。</p>
+    <div id="pvpanel" hidden>
+      <div class="pvt" id="pvt"></div>
+      <div id="pvbox"><div id="pvp"></div></div>
+      <div class="row"><button id="pvplay">▶ 開始位置から試聴</button><button class="ghost" id="pvhead">最初から</button><button class="ghost" id="pvstop">■ 停止</button></div>
+      <div class="row"><button id="pvadd">＋ メドレーに追加</button></div>
+    </div>
     <p class="empty" id="gmsg" style="margin:6px 0 0"></p>
     <div id="gcse"></div>
   </details>
@@ -175,11 +186,9 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 <div id="t-rel" hidden>
 <section>
   <h2>関連メドレー</h2>
-  <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連する曲を集めて次々に再生します。APIキーは要りません。</p>
+  <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連曲を集めて次々に再生します。最初の曲から2曲、その2曲からさらに2曲ずつ…と広げて、10曲集めます。以降は「自動で追加」や「今すぐ関連曲を追加」で増やせます。APIキーは要りません。</p>
   <label class="lab" for="rseed">最初の曲（動画のURL）</label>
   <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
-  <div class="row"><div class="grow"><label class="lab" for="rcount">集める曲数</label>
-    <select id="rcount"><option>5</option><option selected>8</option><option>12</option><option>20</option></select></div></div>
   <div class="row"><button id="rstart">この曲の関連曲で再生</button></div>
 </section>
 <section>
@@ -241,6 +250,7 @@ body{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
 <div id="tmpbox" hidden style="margin:8px 0 0"></div>
 </main>
 
+<div id="toast" hidden role="status" aria-live="polite"></div>
 <div class="bar"><div class="in">
   <div class="nowrow mc"><img id="nth" alt="" hidden width="48" height="27" style="width:48px;height:27px;object-fit:cover;border-radius:3px;flex:none"><span id="nowt">停止中</span><span id="remt"></span></div>
   <input id="pseek" class="mc" type="range" min="0" max="100" step="0.1" value="0" aria-label="この曲の再生位置">
@@ -350,7 +360,8 @@ function addIds(ids,titles){
     if(!t.title)fetchTitle(t);
   });
   save();fixQueue();render();
-  $('#addmsg').textContent=(add?add+'曲を追加しました。':'')+(skip?skip+'曲は追加済みのためスキップしました。':'');
+  const msg=(add?add+'曲を追加しました（全'+tracks.length+'曲）。':'')+(skip?skip+'曲は追加済みのためスキップしました。':'');
+  $('#addmsg').textContent=msg;if(msg)toast(msg);
 }
 $('#add').onclick=()=>{const ids=$('#urls').value.split(/\s+/).map(vid).filter(Boolean);if(ids.length){addIds(ids);$('#urls').value=''}};
 let tmpN=0,tmpActive=0;
@@ -456,6 +467,7 @@ async function keepAwake(){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running)keepAwake()});
 function cutTo(i,back,noVisit){
   if(players.length<3||!tracks[i])return;
+  pvStop();
   clearInterval(fadeTimer);fading=false;pendingPause=null;
   players.forEach((p,k)=>{if(k!==cur)p.pauseVideo()});
   idx=i;armed=false;hold=false;if(!noVisit)visit(i,back);const t=tracks[i];
@@ -648,6 +660,7 @@ function quizPrep(){
 let curTab='med';
 function setTab(t){
   const q=t==='quiz';
+  pvStop();
   if(q){stopAll();qshow('qsetup');quizPrep()}
   else if(curTab==='quiz'){qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
   if(t==='rel')renderRel();
@@ -887,14 +900,32 @@ function makeRelList(name,trs,rel){
   if(!iOS)cutTo(queue[0]);
   return l;
 }
+async function collectBFS(seedId,total){
+  const excl=new Set([seedId]),titles=new Set(),out=[];
+  let frontier=[seedId];
+  for(let depth=0;depth<6&&out.length<total&&frontier.length;depth++){
+    const res=await pool(frontier,3,id=>relatedFromMix(id,2,excl)),next=[];
+    for(const group of res){
+      if(!group)continue;
+      for(const c of group){
+        const nt=normT(c.title);
+        if(out.length>=total||excl.has(c.id)||titles.has(nt))continue;
+        excl.add(c.id);titles.add(nt);out.push(c);next.push(c.id);
+      }
+    }
+    frontier=next;rmsg('関連曲を探しています… '+out.length+'/'+total);
+  }
+  return out;
+}
 $('#rstart').onclick=async()=>{
   const id=vid($('#rseed').value.trim());
   if(!id){rmsg('動画のURLかIDを入力してください。');return}
-  const btn=$('#rstart');btn.disabled=true;rmsg('関連曲を探しています…');
+  const btn=$('#rstart');btn.disabled=true;rmsg('関連曲を探しています… 0/10');
   try{
-    const [items,meta]=await Promise.all([relatedFromMix(id,+$('#rcount').value,new Set([id])),fetchMeta(id)]);
-    if(!items.length)throw ce(MIXFAIL);
-    const l=makeRelList('関連：'+(meta.title||id).slice(0,24),[{id,title:meta.title||''},...items],{src:[id],used:[id]});
+    const [items,meta]=await Promise.all([collectBFS(id,10),fetchMeta(id)]);
+    const st=normT(meta.title),rest=items.filter(c=>normT(c.title)!==st);
+    if(!rest.length)throw ce(MIXFAIL);
+    const l=makeRelList('関連：'+(meta.title||id).slice(0,24),[{id,title:meta.title||''},...rest],{src:[id],used:[id]});
     rmsg(l.tracks.length+'曲で開始します。再生が始まらない場合は、下のバーの ▶ を押してください。');
   }catch(e){rmsg(e.custom?e.message:MIXFAIL)}
   finally{btn.disabled=false}
@@ -1005,26 +1036,63 @@ $('#rlist').addEventListener('click',e=>{
 $('#syt').onclick=()=>window.open('https://www.youtube.com/results?search_query='+encodeURIComponent($('#sq').value.trim()),'_blank','noopener');
 $('#sq').addEventListener('keydown',e=>{if(e.key==='Enter')$('#syt').click()});
 
-/* ---- Google検索（APIキー不要）で追加 ---- */
-let cseLoaded=false;
+/* ---- Google検索（APIキー不要）・プレビュー・追加 ---- */
+const CSE_ID='f0875449847e94ae8';
+let cseLoaded=false,toastT=null;
 const gmsg=t=>{$('#gmsg').textContent=t};
-function loadCse(cx){
-  if(!cx||cseLoaded)return;cseLoaded=true;
+function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2800)}
+function loadCse(){
+  if(cseLoaded)return;cseLoaded=true;
   window.__gcse={parsetags:'explicit',callback:()=>{
     try{google.search.cse.element.render({div:'gcse',tag:'search',attributes:{linkTarget:'_blank'}})}catch(e){gmsg('検索ボックスを表示できませんでした。')}
   }};
   const sc=document.createElement('script');
-  sc.src='https://cse.google.com/cse.js?cx='+encodeURIComponent(cx);sc.async=true;
-  sc.onerror=()=>gmsg('Googleの検索を読み込めませんでした。IDを確認してください。');
+  sc.src='https://cse.google.com/cse.js?cx='+CSE_ID;sc.async=true;
+  sc.onerror=()=>gmsg('Googleの検索を読み込めませんでした。');
   document.head.appendChild(sc);
 }
-try{const cx=localStorage.getItem('medley-cx');if(cx){$('#cx').value=cx;loadCse(cx)}}catch(e){}
-$('#cxsave').onclick=()=>{
-  const cx=$('#cx').value.trim();if(!cx){gmsg('検索エンジンIDを入力してください。');return}
-  const changed=cseLoaded;
-  try{localStorage.setItem('medley-cx',cx)}catch(e){}
-  if(changed){gmsg('保存しました。反映するには、ページを再読み込みしてください。');return}
-  gmsg('読み込み中…');loadCse(cx);
+$('#gdet').addEventListener('toggle',()=>{if($('#gdet').open)loadCse()});
+
+let pvs=null,pvPlayer=null,pvReady=false,pvPend=null,pvLimited=false,pvStarted=false,pvTimer=null;
+function pvEnsure(){
+  if(pvPlayer||!window.YT||!YT.Player)return;
+  pvPlayer=new YT.Player('pvp',{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0},events:{
+    onReady:()=>{pvReady=true;if(pvPend){const f=pvPend;pvPend=null;f()}},
+    onStateChange:e=>{
+      if(e.data===1&&pvLimited&&!pvStarted){pvStarted=true;pvTimer=setTimeout(()=>{pvLimited=false;try{pvPlayer.pauseVideo()}catch(x){}},Math.max(5,S.dl)*1000)}
+    },
+    onError:()=>toast('この動画はプレビューできません')}});
+}
+function pvStop(){clearTimeout(pvTimer);pvLimited=false;try{pvPlayer&&pvReady&&pvPlayer.pauseVideo()}catch(e){}}
+function pvPlay(from){
+  if(!pvs)return;
+  pvEnsure();
+  if(!pvPlayer){toast('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
+  const go=()=>{
+    if(running){try{P().pauseVideo()}catch(e){}}
+    clearTimeout(pvTimer);pvLimited=true;pvStarted=false;
+    pvPlayer.setVolume(VOL);pvPlayer.loadVideoById({videoId:pvs.id,startSeconds:from});
+  };
+  if(pvReady)go();else{pvPend=go;toast('プレーヤーを準備中です…')}
+}
+function updatePvAdd(){
+  const has=!!pvs&&tracks.some(t=>t.id===pvs.id),b=$('#pvadd');
+  b.textContent=has?'✓ 追加済み':'＋ メドレーに追加';b.disabled=has;
+}
+function markAdded(el){
+  if(!el||el.querySelector('.cse-badge'))return;
+  el.classList.add('cse-added');el.insertAdjacentHTML('afterbegin','<div class="cse-badge">✓ 追加済み</div>');
+}
+$('#pvplay').onclick=()=>pvPlay(S.ds);
+$('#pvhead').onclick=()=>pvPlay(0);
+$('#pvstop').onclick=pvStop;
+$('#pvadd').onclick=()=>{
+  if(!pvs)return;
+  if(tracks.some(t=>t.id===pvs.id)){toast('すでにメドレーにある曲です。');return}
+  const t={id:pvs.id,title:pvs.title,start:S.ds,len:S.dl};
+  tracks.push(t);save();fixQueue();render();fetchTitle(t);
+  markAdded(pvs.el);updatePvAdd();
+  toast('「'+(pvs.title||pvs.id).slice(0,24)+'」を追加しました（全'+tracks.length+'曲）');
 };
 $('#gcse').addEventListener('click',e=>{
   const a=e.target.closest('a');if(!a)return;
@@ -1032,11 +1100,13 @@ $('#gcse').addEventListener('click',e=>{
   try{const x=new URL(u);if(/google\./.test(x.hostname))u=x.searchParams.get('url')||x.searchParams.get('q')||u}catch(_){}
   const id=vid(u);if(!id)return;
   e.preventDefault();e.stopPropagation();
-  if(tracks.some(t=>t.id===id)){gmsg('すでにリストにあります。');return}
   const title=(a.textContent||'').replace(/\s*[-–|]\s*YouTube\s*$/i,'').trim();
-  const t={id,title,start:S.ds,len:S.dl};
-  tracks.push(t);save();fixQueue();render();fetchTitle(t);
-  gmsg('「'+(title||id).slice(0,30)+'」を追加しました。');
+  pvStop();
+  pvs={id,title,el:a.closest('.gsc-webResult,.gsc-result')};
+  $('#pvt').textContent=title||id;$('#pvpanel').hidden=false;
+  pvEnsure();updatePvAdd();
+  if(tracks.some(t=>t.id===id))markAdded(pvs.el);
+  $('#pvpanel').scrollIntoView({behavior:'smooth',block:'nearest'});
 },true);
 $('#sgg').onclick=()=>window.open('https://www.google.com/search?q='+encodeURIComponent($('#sq').value.trim()+' site:youtube.com'),'_blank','noopener');
 
@@ -1064,6 +1134,7 @@ $('#lenp').onclick=()=>{if(tracks[idx])setLen(tracks[idx].len+1)};
 $('#lenp5').onclick=()=>{if(tracks[idx])setLen(tracks[idx].len+5)};
 
 $('#pp').onclick=()=>{
+  pvStop();
   if(players.length<2){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
   if(!tracks.length){alert('先に曲を追加してください。');return}
   if(idx<0||!running){if(idx<0){if(queue.length!==tracks.length)resetBag();cutTo(queue[0])}else cutTo(idx);return}
