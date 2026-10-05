@@ -168,6 +168,25 @@ body.np-open.np-ready .players>.pw.cur{position:fixed;z-index:36;left:var(--npx)
   #npstage{max-width:100%}
   #npside{width:auto;flex:1 1 auto;border-left:0;border-top:1px solid var(--line)}
 }
+.sr{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:6px 12px;align-items:center;background:var(--sf);border:1px solid var(--line);border-radius:12px;padding:10px;margin:0 0 10px}
+.sr>img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:var(--line);display:block}
+.srinfo{min-width:0;display:flex;flex-direction:column;gap:2px}
+.srt{font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.srs{font-size:12px;color:var(--mute);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.srd{font-size:12px;color:var(--mute)}
+.srd.long{color:#ffb454}
+.srbtn{display:flex;gap:8px;align-items:center}
+.srplay{width:40px;height:40px;padding:0;border-radius:8px}
+.sradd{padding:10px 12px;white-space:nowrap}
+.srbar{grid-column:1/-1;display:flex;align-items:center;gap:10px}
+.srp{flex:1;min-width:0;padding:0;border:0;background:none;accent-color:var(--ac);height:20px}
+.srtime{font-size:11px;color:var(--mute);white-space:nowrap}
+body:not(.cse-show) .gsc-modal-background-image,body:not(.cse-show) .gsc-results-wrapper-overlay{visibility:hidden!important;pointer-events:none!important;position:fixed!important;left:-99999px!important}
+body:not(.cse-show) #gcse{display:none}
+@media (max-width:600px){
+  .sr{grid-template-columns:96px minmax(0,1fr)}
+  .srbtn{grid-column:1/-1;justify-content:flex-end}
+}
 </style>
 </head>
 <body>
@@ -244,10 +263,16 @@ body.np-open.np-ready .players>.pw.cur{position:fixed;z-index:36;left:var(--npx)
 
 <div id="t-search" hidden>
 <section>
-  <h2 id="sqhead">検索結果</h2>
-  <p class="empty" style="font-size:13px;margin:0">動画をタップすると、プレビューして、メドレーに追加できます。</p>
+  <div class="lab" style="margin:0">SEARCH</div>
+  <h2 id="sqhead" style="font-size:20px;margin:2px 0 4px">曲を探す</h2>
+  <div class="row" style="margin-top:4px;justify-content:space-between">
+    <span id="scount" class="empty"></span>
+    <label><input id="smusic" type="checkbox" checked style="width:auto"> 音楽に絞る</label>
+  </div>
   <p class="empty" id="gmsg" style="margin:6px 0 0"></p>
 </section>
+<div id="sres"></div>
+<div class="row"><button class="ghost" id="smore" hidden>さらに表示</button></div>
 <div id="gcse"></div>
 </div>
 
@@ -910,7 +935,7 @@ const ce=m=>{const e=new Error(m);e.custom=true;return e};
 const MIXFAIL='YouTubeのミックスから、曲を取得できませんでした。ミックスが埋め込みで使えないか、関連動画に音楽以外のものしかなかった可能性があります。';
 const normT=t=>(t||'').toLowerCase().replace(/[\s\-–—_/・:：|｜「」『』【】\[\]()（）]+/g,'');
 const NEG=/(実況|ゲーム|攻略|解説|講座|レビュー|開封|ニュース|雑談|配信|切り抜き|ASMR|リアクション|reaction|vlog|tutorial|how to|trailer|予告|メイキング|舞台裏|作業用|睡眠用|耐久|メドレー|まとめ|ランキング|top ?\d+|\d+ ?(hours?|時間)|full album|フルアルバム|ダイジェスト|ラジオ|podcast|インタビュー|interview|生放送|#shorts|shorts|会見|ドッキリ|検証|やってみた)/i;
-const POS=/(official|music video|\bmv\b|lyric|lyrics|audio|feat\.?|ft\.?|歌ってみた|cover|オリジナル曲|ボカロ|vocaloid|ミュージックビデオ|\bver\.?|remix|acoustic|instrumental|\bpv\b)/i;
+const POS=/(official|music video|\bmv\b|lyric|lyrics|audio|feat\.?|ft\.?|歌ってみた|cover|original|オリジナル|ボカロ|vocaloid|ミュージックビデオ|\bver\.?|remix|acoustic|instrumental|\bpv\b)/i;
 function musicScore(title,author){
   if(NEG.test(title))return -9;
   let sc=0;
@@ -1082,9 +1107,10 @@ $('#rlist').addEventListener('click',e=>{
   running=true;cutTo(+b.closest('.rr').dataset.i);
 });
 
-/* ---- 検索（Googleカスタム検索）・プレビュー・追加 ---- */
+/* ---- 検索（Googleカスタム検索）・結果カード・プレビュー・追加 ---- */
 const CSE_ID='f0875449847e94ae8';
-let cseLoaded=false,cseReady=false,pendingQ=null,toastT=null;
+let cseLoaded=false,cseReady=false,pendingQ=null,pendingMore=false,toastT=null;
+let sres=[],sQuery='',showRest=false,activeRow=null,pvFrom=0,seekUntil=0;
 const gmsg=t=>{$('#gmsg').textContent=t};
 function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2800)}
 function anchorId(a){
@@ -1092,8 +1118,69 @@ function anchorId(a){
   try{const x=new URL(u);if(/google\./.test(x.hostname))u=x.searchParams.get('url')||x.searchParams.get('q')||u}catch(_){}
   return vid(u);
 }
+const fmtHMS=sec=>{sec=Math.round(sec);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),x=sec%60;return h?h+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'):m+':'+String(x).padStart(2,'0')};
+
+/* 音楽以外の動画をなるべく除く */
+const NEGQ=' -雑談 -配信 -切り抜き -実況 -アーカイブ -歌枠 -ASMR';
+const POSQ=' (MV OR "Official Music Video" OR "Provided to YouTube by" OR 歌ってみた OR original OR Lyric OR 楽曲 OR cover)';
+const NEGT=/(雑談|配信|切り抜き|実況|アーカイブ|歌枠|歓談|生放送|ライブ配信|\bchat\b|\btalk\b|stream|karaoke|カラオケ|ASMR|reaction|リアクション|解説|攻略|ゲーム|vlog|ニュース|予告|trailer|作業用|睡眠用|メドレー|まとめ|ランキング|\d+ ?(hours?|時間)|#shorts|shorts|ラジオ|podcast|インタビュー|interview|ドッキリ|検証|やってみた|開封)/i;
+function resScore(title,snip){
+  if(NEGT.test(title))return -9;
+  let sc=0;
+  if(/Provided to YouTube by/i.test(snip))sc+=6;
+  if(POS.test(title))sc+=2;
+  if(/\s[-–／/]\s|[「『].+[」』]|【.+】/.test(title))sc+=1;
+  if(/(配信|雑談|アーカイブ|stream)/i.test(snip))sc-=2;
+  return sc;
+}
+function scrapeCse(){
+  const out=[];
+  document.querySelectorAll('.gsc-webResult.gsc-result').forEach(el=>{
+    const a=Array.from(el.querySelectorAll('a.gs-title')).find(x=>(x.textContent||'').trim());
+    if(!a)return;
+    const id=anchorId(a);if(!id)return;
+    const title=(a.textContent||'').replace(/\s*[-–|]\s*YouTube\s*$/i,'').trim();
+    const sn=el.querySelector('.gs-snippet');
+    const snip=((sn&&sn.textContent)||'').replace(/^\s*\d{4}\/\d{1,2}\/\d{1,2}\s*\.\.\.\s*/,'').trim();
+    out.push({id,title,snip,score:resScore(title,snip)});
+  });
+  return out;
+}
+function cardHTML(r){
+  const has=tracks.some(t=>t.id===r.id);
+  return `<div class="sr" data-id="${r.id}"><img src="https://i.ytimg.com/vi/${r.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="srinfo"><span class="srt">${esc(r.title)}</span><span class="srs">${esc(r.snip)}</span><span class="srd"></span></div><div class="srbtn"><button class="ghost srplay" data-a="rplay" aria-label="試聴">▶</button><button class="sradd" data-a="radd"${has?' disabled':''}>${has?'✓ 追加済み':'＋追加'}</button></div><div class="srbar"><input type="range" class="srp" min="0" max="${S.dl}" step="0.1" value="0" aria-label="試聴位置"><span class="srtime">0:00 / ${fmt(S.dl)}</span></div></div>`;
+}
+function setRowPlaying(row,on){const b=row&&row.querySelector('.srplay');if(b)b.textContent=on?'■':'▶'}
+function resetRowUI(row){
+  if(!row)return;setRowPlaying(row,false);
+  const p=row.querySelector('.srp'),t=row.querySelector('.srtime');
+  if(p)p.value=0;if(t)t.textContent='0:00 / '+fmt(S.dl);
+}
+function renderResults(){
+  const good=sres.filter(r=>r.score>=1).sort((a,b)=>b.score-a.score),rest=sres.filter(r=>r.score<1);
+  const showAll=showRest||!good.length;
+  $('#sres').innerHTML=good.map(cardHTML).join('')
+    +(rest.length&&good.length?`<div class="row"><button class="ghost" id="srest">${showAll?'音楽ではない可能性が高い動画を隠す':'音楽ではない可能性が高い動画も表示（'+rest.length+'件）'}</button></div>`:'')
+    +(showAll?rest.map(cardHTML).join(''):'');
+  $('#scount').textContent=(showAll?sres.length:good.length)+'件表示中';
+  activeRow=pvs?document.querySelector('#sres .sr[data-id="'+pvs.id+'"]'):null;
+  if(activeRow&&pvLimited)setRowPlaying(activeRow,true);
+}
+function mergeResults(items){
+  const have=new Set(sres.map(r=>r.id));
+  items.forEach(r=>{if(!have.has(r.id)){have.add(r.id);sres.push(r)}});
+  renderResults();
+  const cur=document.querySelector('.gsc-cursor-current-page');
+  $('#smore').hidden=!(cur&&cur.nextElementSibling);
+}
+function loadMore(){
+  const cur=document.querySelector('.gsc-cursor-current-page'),next=cur&&cur.nextElementSibling;
+  if(next){pendingMore=true;gmsg('続きを読み込み中…');next.click()}else{$('#smore').hidden=true;toast('これ以上の結果はありません')}
+}
 function markAdded(el){
-  if(!el||el.querySelector('.cse-badge'))return;
+  if(!el)return;
+  if(el.classList.contains('sr')){const b=el.querySelector('.sradd');if(b){b.textContent='✓ 追加済み';b.disabled=true}return}
+  if(el.querySelector('.cse-badge'))return;
   el.classList.add('cse-added');el.insertAdjacentHTML('afterbegin','<div class="cse-badge">✓ 追加済み</div>');
 }
 function markAllAdded(){
@@ -1109,11 +1196,18 @@ function loadCse(){
   window.__gcse={parsetags:'explicit',
     callback:()=>{
       try{
-        google.search.cse.element.render({div:'gcse',tag:'searchresults-only',gname:'medley',attributes:{linkTarget:'_blank',enableHistory:false}});
+        google.search.cse.element.render({div:'gcse',tag:'searchresults-only',gname:'medley',attributes:{linkTarget:'_blank',enableHistory:false,numResults:20}});
         cseReady=true;if(pendingQ){const q=pendingQ;pendingQ=null;execSearch(q)}
       }catch(e){gmsg('検索を表示できませんでした。')}
     },
-    searchCallbacks:{web:{rendered:()=>{gmsg('');markAllAdded()}}}};
+    searchCallbacks:{web:{rendered:()=>{
+      document.documentElement.style.overflow='';document.body.style.overflow='';
+      const items=scrapeCse();
+      if(!items.length&&!sres.length){
+        document.body.classList.add('cse-show');gmsg('結果を整形できなかったため、Googleの表示を使います。');markAllAdded();return;
+      }
+      pendingMore=false;gmsg('');mergeResults(items);
+    }}}};
   const sc=document.createElement('script');
   sc.src='https://cse.google.com/cse.js?cx='+CSE_ID;sc.async=true;
   sc.onerror=()=>gmsg('Googleの検索を読み込めませんでした。');
@@ -1122,11 +1216,15 @@ function loadCse(){
 function doSearch(q){
   if(!q)return;
   setTab('search');
+  sQuery=q;sres=[];showRest=false;pendingMore=false;activeRow=null;
+  document.body.classList.remove('cse-show');
+  $('#sres').innerHTML='';$('#scount').textContent='';$('#smore').hidden=true;
   $('#sqhead').textContent='「'+q+'」の検索結果';gmsg('検索中…');
   $('#sq').blur();
-  if(!cseLoaded){pendingQ=q;loadCse()}
-  else if(cseReady)execSearch(q);
-  else pendingQ=q;
+  const full=q+NEGQ+($('#smusic').checked?POSQ:'');
+  if(!cseLoaded){pendingQ=full;loadCse()}
+  else if(cseReady)execSearch(full);
+  else pendingQ=full;
 }
 $('#sq').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();doSearch($('#sq').value.trim())}
@@ -1134,18 +1232,34 @@ $('#sq').addEventListener('keydown',e=>{
 $('#sgo').onclick=()=>doSearch($('#sq').value.trim());
 $('#sq').addEventListener('input',()=>{$('#sclr').hidden=!$('#sq').value});
 $('#sclr').onclick=()=>{$('#sq').value='';$('#sclr').hidden=true;$('#sq').focus()};
+$('#smusic').onchange=()=>{if(sQuery)doSearch(sQuery)};
+$('#smore').onclick=loadMore;
 
+/* ---- プレビュー用プレーヤー ---- */
 let pvs=null,pvPlayer=null,pvReady=false,pvPend=null,pvLimited=false,pvStarted=false,pvTimer=null;
 function pvEnsure(){
   if(pvPlayer||!window.YT||!YT.Player)return;
   pvPlayer=new YT.Player('pvp',{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0},events:{
     onReady:()=>{pvReady=true;if(pvPend){const f=pvPend;pvPend=null;f()}},
     onStateChange:e=>{
-      if(e.data===1&&pvLimited&&!pvStarted){pvStarted=true;pvTimer=setTimeout(()=>{pvLimited=false;try{pvPlayer.pauseVideo()}catch(x){}},Math.max(5,S.dl)*1000)}
+      if(e.data===1){
+        if(activeRow){
+          setRowPlaying(activeRow,true);
+          try{
+            const d=pvPlayer.getDuration(),el=activeRow.querySelector('.srd');
+            if(d>0&&el){el.textContent='長さ '+fmtHMS(d)+(d>720?'（長い動画です）':'');el.classList.toggle('long',d>720)}
+          }catch(x){}
+        }
+        if(pvLimited&&!pvStarted){pvStarted=true;pvTimer=setTimeout(()=>{pvLimited=false;try{pvPlayer.pauseVideo()}catch(x){}},Math.max(5,S.dl)*1000)}
+      }else if(activeRow)setRowPlaying(activeRow,false);
     },
     onError:()=>toast('この動画はプレビューできません')}});
 }
-function pvStop(){clearTimeout(pvTimer);pvLimited=false;try{pvPlayer&&pvReady&&pvPlayer.pauseVideo()}catch(e){}}
+function pvStop(){
+  clearTimeout(pvTimer);pvLimited=false;
+  try{pvPlayer&&pvReady&&pvPlayer.pauseVideo()}catch(e){}
+  if(activeRow)setRowPlaying(activeRow,false);
+}
 function pvPlay(from){
   if(!pvs)return;
   pvEnsure();
@@ -1161,30 +1275,64 @@ function updatePvAdd(){
   const has=!!pvs&&tracks.some(t=>t.id===pvs.id),b=$('#pvadd');
   b.textContent=has?'✓ 追加済み':'＋ メドレーに追加';b.disabled=has;
 }
-$('#pvplay').onclick=()=>pvPlay(S.ds);
-$('#pvhead').onclick=()=>pvPlay(0);
-$('#pvstop').onclick=pvStop;
-$('#pvadd').onclick=()=>{
-  if(!pvs)return;
-  if(tracks.some(t=>t.id===pvs.id)){toast('すでにメドレーにある曲です。');return}
-  const t={id:pvs.id,title:pvs.title,start:S.ds,len:S.dl};
+function addSearchResult(r,row){
+  if(tracks.some(t=>t.id===r.id)){toast('すでにメドレーにある曲です。');markAdded(row);return}
+  const t={id:r.id,title:r.title,start:S.ds,len:S.dl};
   tracks.push(t);save();fixQueue();render();fetchTitle(t);
-  markAdded(pvs.el);updatePvAdd();
-  toast('「'+(pvs.title||pvs.id).slice(0,24)+'」を追加しました（全'+tracks.length+'曲）');
-};
+  markAdded(row);updatePvAdd();
+  toast('「'+r.title.slice(0,24)+'」を追加しました（全'+tracks.length+'曲）');
+}
+function toggleRowPlay(r,row){
+  if(activeRow===row&&pvLimited){pvStop();return}
+  pvStop();
+  if(activeRow&&activeRow!==row)resetRowUI(activeRow);
+  activeRow=row;pvFrom=S.ds;
+  pvs={id:r.id,title:r.title,el:row};
+  $('#pvt').textContent=r.title;$('#pvpanel').hidden=false;
+  pvEnsure();updatePvAdd();
+  pvPlay(S.ds);setRowPlaying(row,true);
+}
+$('#sres').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.id==='srest'){showRest=!showRest;renderResults();return}
+  const row=b.closest('.sr');if(!row)return;
+  const r=sres.find(x=>x.id===row.dataset.id);if(!r)return;
+  if(b.dataset.a==='radd')addSearchResult(r,row);
+  else if(b.dataset.a==='rplay')toggleRowPlay(r,row);
+});
+$('#sres').addEventListener('input',e=>{
+  const p=e.target.closest('.srp');if(!p)return;
+  const row=p.closest('.sr');
+  if(row!==activeRow||!pvPlayer||!pvReady){p.value=0;return}
+  seekUntil=Date.now()+700;
+  try{pvPlayer.seekTo(pvFrom+(+p.value),true)}catch(x){}
+});
+setInterval(()=>{
+  if(!activeRow||!pvPlayer||!pvReady||Date.now()<seekUntil)return;
+  let t=0;try{t=pvPlayer.getCurrentTime()-pvFrom}catch(e){return}
+  const p=activeRow.querySelector('.srp'),x=activeRow.querySelector('.srtime');
+  if(p)p.value=Math.max(0,Math.min(S.dl,t));
+  if(x)x.textContent=fmt(Math.max(0,Math.min(S.dl,t)))+' / '+fmt(S.dl);
+},250);
+$('#pvplay').onclick=()=>{pvFrom=S.ds;pvPlay(S.ds)};
+$('#pvhead').onclick=()=>{pvFrom=0;pvPlay(0)};
+$('#pvstop').onclick=pvStop;
+$('#pvadd').onclick=()=>{if(pvs){const r=sres.find(x=>x.id===pvs.id)||{id:pvs.id,title:pvs.title};addSearchResult(r,pvs.el)}};
+$('#pvclose').onclick=()=>{pvStop();$('#pvpanel').hidden=true};
+/* Googleの表示にフォールバックした場合のみ使う */
 document.addEventListener('click',e=>{
+  if(!document.body.classList.contains('cse-show'))return;
   const a=e.target.closest('a');
   if(!a||!a.closest('.gsc-webResult,.gsc-result,.gsc-results,#gcse'))return;
   const id=anchorId(a);if(!id)return;
   e.preventDefault();e.stopPropagation();
   const title=(a.textContent||'').replace(/\s*[-–|]\s*YouTube\s*$/i,'').trim();
-  pvStop();
+  pvStop();pvFrom=S.ds;
   pvs={id,title,el:a.closest('.gsc-webResult,.gsc-result')};
   $('#pvt').textContent=title||id;$('#pvpanel').hidden=false;
   pvEnsure();updatePvAdd();
   if(tracks.some(t=>t.id===id))markAdded(pvs.el);
 },true);
-$('#pvclose').onclick=()=>{pvStop();$('#pvpanel').hidden=true};
 
 /* ---- サイドバー ---- */
 let menuId=null,npT=null;
