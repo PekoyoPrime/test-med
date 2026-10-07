@@ -187,6 +187,13 @@ body:not(.cse-show) #gcse{display:none}
   .sr{grid-template-columns:96px minmax(0,1fr)}
   .srbtn{grid-column:1/-1;justify-content:flex-end}
 }
+#sug{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#212121;border:1px solid #3a3a3a;border-radius:10px;padding:6px 0;max-height:min(70vh,520px);overflow-y:auto;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+.sgi{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;font-weight:500}
+.sgi:hover,.sgi.on{background:#303030}
+.sgi .ico2{flex:none;width:20px;text-align:center;color:var(--mute)}
+.sgi .sgt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sgi .sgx{flex:none;background:transparent;color:var(--mute);border:0;padding:2px 8px;font-size:18px}
+.sgi .sgx:hover{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -210,6 +217,7 @@ body:not(.cse-show) #gcse{display:none}
     <button id="sgo" aria-label="検索"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg></button>
     <input id="sq" type="search" placeholder="曲名、アーティストで検索" enterkeyhint="search" autocomplete="off">
     <button id="sclr" aria-label="クリア" hidden>×</button>
+    <div id="sug" role="listbox" hidden></div>
   </div>
 </header>
 <main>
@@ -1127,16 +1135,22 @@ function anchorId(a){
 const fmtHMS=sec=>{sec=Math.round(sec);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),x=sec%60;return h?h+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'):m+':'+String(x).padStart(2,'0')};
 
 /* 音楽以外の動画をなるべく除く */
-const NEGQ=' -雑談 -配信 -切り抜き -実況 -アーカイブ -歌枠 -ASMR';
+const NEGQ=' -雑談 -切り抜き -実況 -アーカイブ -歌枠 -ASMR';
 const POSQ=' (MV OR "Official Music Video" OR "Provided to YouTube by" OR 歌ってみた OR original OR Lyric OR 楽曲 OR cover)';
-const NEGT=/(雑談|配信|切り抜き|実況|アーカイブ|歌枠|歓談|生放送|ライブ配信|\bchat\b|\btalk\b|stream|karaoke|カラオケ|ASMR|reaction|リアクション|解説|攻略|ゲーム|vlog|ニュース|予告|trailer|作業用|睡眠用|メドレー|まとめ|ランキング|\d+ ?(hours?|時間)|#shorts|shorts|ラジオ|podcast|インタビュー|interview|ドッキリ|検証|やってみた|開封)/i;
-function resScore(title,snip){
+const NEGT=/(雑談|生配信|配信アーカイブ|【配信】|切り抜き|実況|アーカイブ|歌枠|歓談|生放送|ライブ配信|\bchat\b|\btalk\b|stream|karaoke|カラオケ|ASMR|reaction|リアクション|解説|攻略|ゲーム|vlog|ニュース|予告|trailer|作業用|睡眠用|メドレー|まとめ|ランキング|\d+ ?(hours?|時間)|#shorts|shorts|ラジオ|podcast|インタビュー|interview|ドッキリ|検証|やってみた|開封)/i;
+function matchBoost(title,q){
+  const tk=(q||'').replace(/[～〜~"]/g,' ').toLowerCase().split(/\s+/).filter(w=>w.length>1);
+  if(!tk.length)return 0;
+  const tl=title.toLowerCase(),n=tk.filter(w=>tl.includes(w)).length;
+  return n===tk.length?3:(n*2>=tk.length?1:0);
+}
+function resScore(title,snip,q){
   if(NEGT.test(title))return -9;
-  let sc=0;
+  let sc=matchBoost(title,q);
   if(/Provided to YouTube by/i.test(snip))sc+=6;
   if(POS.test(title))sc+=2;
   if(/\s[-–／/]\s|[「『].+[」』]|【.+】/.test(title))sc+=1;
-  if(/(配信|雑談|アーカイブ|stream)/i.test(snip))sc-=2;
+  if(/(雑談|アーカイブ|ライブ配信|生配信|streamed live)/i.test(snip))sc-=2;
   return sc;
 }
 function scrapeCse(){
@@ -1148,7 +1162,7 @@ function scrapeCse(){
     const title=(a.textContent||'').replace(/\s*[-–|]\s*YouTube\s*$/i,'').trim();
     const sn=el.querySelector('.gs-snippet');
     const snip=((sn&&sn.textContent)||'').replace(/^\s*\d{4}\/\d{1,2}\/\d{1,2}\s*\.\.\.\s*/,'').trim();
-    out.push({id,title,snip,score:resScore(title,snip)});
+    out.push({id,title,snip,score:resScore(title,snip,sQuery)});
   });
   return out;
 }
@@ -1164,9 +1178,9 @@ function resetRowUI(row){
 }
 function renderResults(){
   const good=sres.filter(r=>r.score>=1).sort((a,b)=>b.score-a.score),rest=sres.filter(r=>r.score<1);
-  const showAll=showRest||!good.length;
+  const only=$('#smusic').checked,showAll=!only||showRest||!good.length;
   $('#sres').innerHTML=good.map(cardHTML).join('')
-    +(rest.length&&good.length?`<div class="row"><button class="ghost" id="srest">${showAll?'音楽ではない可能性が高い動画を隠す':'音楽ではない可能性が高い動画も表示（'+rest.length+'件）'}</button></div>`:'')
+    +(only&&rest.length&&good.length?`<div class="row"><button class="ghost" id="srest">${showAll?'音楽ではない可能性が高い動画を隠す':'音楽ではない可能性が高い動画も表示（'+rest.length+'件）'}</button></div>`:'')
     +(showAll?rest.map(cardHTML).join(''):'');
   $('#scount').textContent=(showAll?sres.length:good.length)+'件表示中';
   activeRow=pvs?document.querySelector('#sres .sr[data-id="'+pvs.id+'"]'):null;
@@ -1203,42 +1217,123 @@ function loadCse(){
     callback:()=>{
       try{
         google.search.cse.element.render({div:'gcse',tag:'searchresults-only',gname:'medley',attributes:{linkTarget:'_blank',enableHistory:false,numResults:20}});
-        cseReady=true;if(pendingQ){const q=pendingQ;pendingQ=null;execSearch(q)}
+        cseReady=true;if(pendingQ){pendingQ=null;runNextStage()}
       }catch(e){gmsg('検索を表示できませんでした。')}
     },
     searchCallbacks:{web:{rendered:()=>{
       document.documentElement.style.overflow='';document.body.style.overflow='';
+      clearTimeout(stageTimer);
       const items=scrapeCse();
-      if(!items.length&&!sres.length){
+      if(!items.length&&!sres.length&&!qStages.length){
         document.body.classList.add('cse-show');gmsg('結果を整形できなかったため、Googleの表示を使います。');markAllAdded();return;
       }
-      pendingMore=false;gmsg('');mergeResults(items);
+      pendingMore=false;
+      if(items.length){gmsg('');mergeResults(items)}
+      if(qStages.length)runNextStage();
     }}}};
   const sc=document.createElement('script');
   sc.src='https://cse.google.com/cse.js?cx='+CSE_ID;sc.async=true;
   sc.onerror=()=>gmsg('Googleの検索を読み込めませんでした。');
   document.head.appendChild(sc);
 }
+let qStages=[],stageTimer=null;
+function runNextStage(){
+  clearTimeout(stageTimer);
+  const q=qStages.shift();if(!q)return;
+  execSearch(q);
+  if(qStages.length)stageTimer=setTimeout(runNextStage,7000);
+}
+async function directVideo(id){
+  gmsg('動画を確認中…');
+  const m=await fetchMeta(id);
+  sres=[{id,title:m.ok?m.title:id,snip:'URLで指定された動画',score:9}];
+  gmsg(m.ok?'':'この動画の情報を取得できませんでした（埋め込み不可の可能性があります）。');
+  renderResults();
+}
 function doSearch(q){
   if(!q)return;
+  addHist(q);hideSug();
   setTab('search');
-  sQuery=q;sres=[];showRest=false;pendingMore=false;activeRow=null;
+  sQuery=q;sres=[];showRest=false;pendingMore=false;activeRow=null;qStages=[];clearTimeout(stageTimer);
   document.body.classList.remove('cse-show');
   $('#sres').innerHTML='';$('#scount').textContent='';$('#smore').hidden=true;
-  $('#sqhead').textContent='「'+q+'」の検索結果';gmsg('検索中…');
-  $('#sq').blur();
-  const full=q+NEGQ+($('#smusic').checked?POSQ:'');
-  if(!cseLoaded){pendingQ=full;loadCse()}
-  else if(cseReady)execSearch(full);
-  else pendingQ=full;
+  $('#sqhead').textContent='「'+q+'」の検索結果';$('#sq').blur();
+  const id=/youtu/.test(q)?vid(q):null;
+  if(id){directVideo(id);return}
+  gmsg('検索中…');
+  const base=q.replace(/[～〜~]+/g,' ').replace(/\s+/g,' ').trim();
+  qStages=[base+' "Provided to YouTube by"',base+NEGQ];
+  if(!cseLoaded){pendingQ=true;loadCse()}
+  else if(cseReady)runNextStage();
+  else pendingQ=true;
 }
+
+/* ---- 検索候補と履歴 ---- */
+let hist=[];try{hist=JSON.parse(localStorage.getItem('medley-hist')||'[]')}catch(e){}
+function addHist(q){hist=[q,...hist.filter(x=>x!==q)].slice(0,30);try{localStorage.setItem('medley-hist',JSON.stringify(hist))}catch(e){}}
+let sugItems=[],sugSel=-1,sugReq=0,sugTimer=null,sugRemote=[];
+function hideSug(){$('#sug').hidden=true;sugSel=-1}
+function renderSug(){
+  const q=$('#sq').value.trim(),box=$('#sug');
+  const h=(q?hist.filter(x=>x.toLowerCase().includes(q.toLowerCase())):hist).slice(0,q?4:10);
+  const remote=(q?sugRemote:[]).filter(x=>!h.includes(x)).slice(0,10);
+  sugItems=[...h.map(t=>({t,h:true})),...remote.map(t=>({t,h:false}))];
+  if(!sugItems.length){hideSug();return}
+  box.innerHTML=sugItems.map((x,i)=>`<div class="sgi${i===sugSel?' on':''}" data-i="${i}" role="option"><span class="ico2">${x.h?'🕘':'🔍'}</span><span class="sgt">${esc(x.t)}</span>${x.h?'<button class="sgx" data-del="'+i+'" aria-label="履歴から削除">×</button>':''}</div>`).join('');
+  box.hidden=false;
+}
+function fetchSug(q){
+  const my=++sugReq,cb='sug'+my+Math.random().toString(36).slice(2,6),sc=document.createElement('script');
+  const done=()=>{delete window[cb];sc.remove()};
+  window[cb]=d=>{
+    done();if(my!==sugReq)return;
+    try{sugRemote=(d[1]||[]).map(x=>Array.isArray(x)?x[0]:x).filter(Boolean)}catch(e){sugRemote=[]}
+    renderSug();
+  };
+  sc.onerror=done;
+  sc.src='https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&hl=ja&q='+encodeURIComponent(q)+'&jsonp='+cb;
+  document.head.appendChild(sc);
+  setTimeout(()=>{if(window[cb])done()},6000);
+}
+function pickSug(t){$('#sq').value=t;$('#sclr').hidden=false;doSearch(t)}
 $('#sq').addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();doSearch($('#sq').value.trim())}
+  const box=$('#sug');
+  if((e.key==='ArrowDown'||e.key==='ArrowUp')&&!box.hidden&&sugItems.length){
+    e.preventDefault();
+    sugSel=e.key==='ArrowDown'?Math.min(sugItems.length-1,sugSel+1):Math.max(-1,sugSel-1);
+    box.querySelectorAll('.sgi').forEach((el,i)=>el.classList.toggle('on',i===sugSel));
+    return;
+  }
+  if(e.key==='Escape'){hideSug();return}
+  if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){
+    e.preventDefault();
+    if(sugSel>=0&&sugItems[sugSel])pickSug(sugItems[sugSel].t);else doSearch($('#sq').value.trim());
+  }
 });
 $('#sgo').onclick=()=>doSearch($('#sq').value.trim());
-$('#sq').addEventListener('input',()=>{$('#sclr').hidden=!$('#sq').value});
-$('#sclr').onclick=()=>{$('#sq').value='';$('#sclr').hidden=true;$('#sq').focus()};
-$('#smusic').onchange=()=>{if(sQuery)doSearch(sQuery)};
+$('#sq').addEventListener('input',()=>{
+  $('#sclr').hidden=!$('#sq').value;sugSel=-1;
+  clearTimeout(sugTimer);
+  const q=$('#sq').value.trim();
+  if(!q){sugRemote=[];renderSug();return}
+  renderSug();
+  sugTimer=setTimeout(()=>fetchSug(q),150);
+});
+$('#sq').addEventListener('focus',renderSug);
+$('#sq').addEventListener('click',renderSug);
+$('#sug').addEventListener('click',e=>{
+  const del=e.target.closest('[data-del]');
+  if(del){
+    e.stopPropagation();
+    const it=sugItems[+del.dataset.del];
+    if(it){hist=hist.filter(x=>x!==it.t);try{localStorage.setItem('medley-hist',JSON.stringify(hist))}catch(x){}}
+    renderSug();return;
+  }
+  const row=e.target.closest('.sgi');if(row&&sugItems[+row.dataset.i])pickSug(sugItems[+row.dataset.i].t);
+});
+document.addEventListener('click',e=>{if(!e.target.closest('#sbox'))hideSug()});
+$('#sclr').onclick=()=>{$('#sq').value='';$('#sclr').hidden=true;sugRemote=[];$('#sq').focus();renderSug()};
+$('#smusic').onchange=()=>{if(sQuery)renderResults()};
 $('#smore').onclick=loadMore;
 
 /* ---- プレビュー用プレーヤー ---- */
