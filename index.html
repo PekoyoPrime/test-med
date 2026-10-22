@@ -194,6 +194,37 @@ body:not(.cse-show) #gcse{display:none}
 .sgi .sgt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sgi .sgx{flex:none;background:transparent;color:var(--mute);border:0;padding:2px 8px;font-size:18px}
 .sgi .sgx:hover{color:var(--ink)}
+body.q #tostart,body.q #prev,body.q #next{display:none}
+#sclose{display:none;flex:none;height:40px;padding:0 14px;white-space:nowrap}
+body.search-open #sclose{display:inline-flex;align-items:center}
+.sgi .sgt{font-weight:400}
+.sgi .sgt b{font-weight:700}
+.sgi .sgf{flex:none;background:transparent;color:var(--mute);border:0;padding:2px 8px;font-size:16px}
+.sgi .sgf:hover{color:var(--ink)}
+#nphead,#npinfo,#npseekrow,#npctl{display:none}
+.npth{position:relative;display:block}
+.npi.on .npth::after{content:'';position:absolute;left:6px;bottom:6px;width:16px;height:12px;background:linear-gradient(#fff,#fff) 0 100%/3px 60% no-repeat,linear-gradient(#fff,#fff) 6px 100%/3px 100% no-repeat,linear-gradient(#fff,#fff) 12px 100%/3px 40% no-repeat}
+.npt2{font-size:20px;font-weight:700;margin-top:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+#npseek{width:100%;padding:0;border:0;background:none;accent-color:var(--ac);height:24px;margin:8px 0 0;display:block}
+.npts{display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+#npctl button{width:48px;height:48px;padding:0;margin:0;border:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+#npctl #nppp{width:68px;height:68px}
+#npctl #npshuf,#npctl #nploop{opacity:.5}
+#npctl #npshuf.on,#npctl #nploop.on{opacity:1}
+@media (max-width:899px){
+  #np{left:0;right:0;top:0;bottom:0;z-index:55;flex-direction:column;padding-top:env(safe-area-inset-top);background:linear-gradient(#1c1310,#050505 60%)}
+  #nphead{display:flex;align-items:center;justify-content:space-between;padding:4px 8px;flex:none}
+  #nphead .nphd{font-weight:600;color:var(--mute)}
+  #nphead button{width:44px;height:44px;padding:0;border:0;font-size:24px}
+  #npmain{flex:none;display:block;padding:0 16px}
+  #npstage{width:min(100%,calc(30vh*16/9));max-width:none;margin:0 auto;border-radius:12px}
+  #npinfo,#npseekrow{display:block}
+  #npctl{display:flex;justify-content:space-between;align-items:center;padding:2px 0 10px}
+  #npside{width:auto;flex:1 1 0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;border-left:0;border-top:1px solid var(--line);display:block}
+  #nplist{overflow:visible;flex:none}
+  #npclose{display:none}
+  body.np-open.np-ready .players>.pw.cur{z-index:56}
+}
 </style>
 </head>
 <body>
@@ -219,6 +250,7 @@ body:not(.cse-show) #gcse{display:none}
     <button id="sclr" aria-label="クリア" hidden>×</button>
     <div id="sug" role="listbox" hidden></div>
   </div>
+  <button id="sclose" class="ghost" aria-label="検索結果を閉じる">× 閉じる</button>
 </header>
 <main>
 <div id="ios" class="warn" hidden>iPhone / iPadでは音量を制御できないため、曲間はフェードせず切り替わります。次の曲を先読みして待ち時間を短くしています（ブロックされた場合は自動で通常の切り替えに戻ります）。画面をロックすると再生が止まります。</div>
@@ -271,7 +303,7 @@ body:not(.cse-show) #gcse{display:none}
 
 <div id="t-search" hidden>
 <section>
-  <div class="row" style="margin:0;justify-content:space-between"><div class="lab" style="margin:0">SEARCH</div><button class="ghost" id="sclose" aria-label="検索結果を閉じる">× 閉じる</button></div>
+  <div class="lab" style="margin:0">SEARCH</div>
   <h2 id="sqhead" style="font-size:20px;margin:2px 0 4px">曲を探す</h2>
   <div class="row" style="margin-top:4px;justify-content:space-between">
     <span id="scount" class="empty"></span>
@@ -362,7 +394,22 @@ body:not(.cse-show) #gcse{display:none}
   <div class="row"><button id="pvadd">＋ メドレーに追加</button></div>
 </div>
 <div id="np" role="dialog" aria-label="再生中">
-  <div id="npmain"><div id="npstage"></div></div>
+  <div id="nphead"><button class="ghost" id="npclose2" aria-label="閉じる">⌄</button><span class="nphd">再生中</span><span style="width:44px"></span></div>
+  <div id="npmain">
+    <div id="npstage"></div>
+    <div id="npinfo"><div id="npt" class="npt2"></div><div id="nps" class="empty" style="margin:2px 0 0"></div></div>
+    <div id="npseekrow">
+      <input id="npseek" type="range" min="0" max="30" step="0.1" value="0" aria-label="再生位置">
+      <div class="npts"><span id="npel">0:00</span><span id="npdur">0:30</span></div>
+    </div>
+    <div id="npctl">
+      <button class="ghost ico" id="npshuf" aria-label="シャッフル"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
+      <button class="ghost ico" id="npprev" aria-label="前の曲"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+      <button class="ico" id="nppp" aria-label="再生"></button>
+      <button class="ghost ico" id="npnext" aria-label="次の曲"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+      <button class="ghost ico" id="nploop" aria-label="リピート"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+    </div>
+  </div>
   <div id="npside">
     <div class="nptabs"><span class="nptab">次のコンテンツ</span><button class="ghost" id="npclose" aria-label="閉じる">⌄</button></div>
     <div class="npnow"><div class="lab" style="margin:0">再生中</div><div id="npcur" class="npcur"></div></div>
@@ -375,7 +422,7 @@ body:not(.cse-show) #gcse{display:none}
   <div class="nowrow mc"><img id="nth" alt="" hidden width="48" height="27" style="width:48px;height:27px;object-fit:cover;border-radius:3px;flex:none"><span id="nowt">停止中</span><span id="remt"></span></div>
   <input id="pseek" class="mc" type="range" min="0" max="100" step="0.1" value="0" aria-label="この曲の再生位置">
   <div class="row" style="margin:0">
-    <span class="mc row" style="margin:0;gap:8px">
+    <span class="row" style="margin:0;gap:8px">
       <button class="ghost" id="tostart" title="この曲の開始位置へ戻ります">開始位置へ</button>
       <button class="ghost ico" id="prev" aria-label="前の曲" title="前の曲"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
       <button id="pp" class="ico" aria-label="再生" title="再生 / 一時停止"></button>
@@ -424,7 +471,7 @@ $('#loop').onchange=e=>{S.loop=e.target.checked;save()};
 $('#shuffle').onchange=e=>{S.shuffle=e.target.checked;resetBag();save();render()};
 
 function render(){
-  renderLists();syncLen();markRoles();renderNp();pvLabels();
+  renderLists();syncLen();markRoles();renderNp();pvLabels();refreshAdded();
   if(queue.length!==tracks.length)resetBag();
   renderRel();
   $('#listnote').textContent=S.shuffle&&tracks.length>1?'シャッフル中：再生する順番で表示しています（↑↓で順番を入れ替えられます）':'';
@@ -528,7 +575,7 @@ window.onYouTubeIframeAPIReady=()=>{
   markRoles();
 };
 const P=()=>players[cur];
-let nx=1,nn=2,pv=3,loaded=[-1,-1,-1,-1],pendingPause=null,noSwap=false,queue=[],qpos=-1,nextRound=null;
+let nx=1,nn=2,pv=3,switchDeadline=0,loaded=[-1,-1,-1,-1],pendingPause=null,noSwap=false,queue=[],qpos=-1,nextRound=null;
 function makeQueue(avoid){
   const a=tracks.map((_,k)=>k);
   for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
@@ -607,6 +654,8 @@ function fadeTo(i,back){
   loaded[o]=i;loaded[old]=-1;
   if(hard){
     pendingPause=from;
+    const dlMs=Math.max(0,switchDeadline-Date.now());switchDeadline=0;
+    setTimeout(()=>{if(players[cur]!==from){try{from.pauseVideo()}catch(e){}}},dlMs);
     setTimeout(()=>{
       if(idx===i&&!armed&&running&&cur===o){
         noSwap=iOS;pendingPause=null;to.pauseVideo();loaded[o]=-1;
@@ -641,7 +690,7 @@ function setNow(a,b){$('#nowt').textContent=a;$('#remt').textContent=b||''}
 function markRoles(){players.forEach((_,k)=>{const w=document.getElementById('pw'+k);if(w)w.classList.toggle('cur',k===cur)})}
 const ICON_PLAY='<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
 const ICON_PAUSE='<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
-function setPP(on){const b=$('#pp');b.innerHTML=on?ICON_PAUSE:ICON_PLAY;b.setAttribute('aria-label',on?'一時停止':'再生')}
+function setPP(on){const b=$('#pp');b.innerHTML=on?ICON_PAUSE:ICON_PLAY;b.setAttribute('aria-label',on?'一時停止':'再生');const n=$('#nppp');if(n){n.innerHTML=on?ICON_PAUSE:ICON_PLAY;n.setAttribute('aria-label',on?'一時停止':'再生')}}
 
 setInterval(()=>{
   const t=tracks[idx];
@@ -649,6 +698,10 @@ setInterval(()=>{
   if(S.rel&&vetCurrent())return;
   const el=P().getCurrentTime()-t.start,rem=t.len-el,ps=$('#pseek');
   ps.max=t.len;if(!pdrag)ps.value=Math.min(t.len,Math.max(0,el));
+  if(document.body.classList.contains('np-open')){
+    const ns=$('#npseek');ns.max=t.len;if(!npDrag){ns.value=Math.min(t.len,Math.max(0,el));$('#npel').textContent=fmt(Math.max(0,el))}
+    $('#npdur').textContent=fmt(t.len);
+  }
   setNow((hold?'試聴中（自動で切り替わりません）　':(idx+1)+'/'+tracks.length+'　')+(t.title||t.id),'残り'+Math.max(0,Math.ceil(rem))+'秒');
   const th=$('#nth'),u='https://i.ytimg.com/vi/'+t.id+'/mqdefault.jpg';
   if(th.dataset.s!==u){th.dataset.s=u;th.src=u}th.hidden=false;
@@ -656,8 +709,8 @@ setInterval(()=>{
   if(!fading&&!pendingPause)preload();
   if(S.rel)vetCued();
   if(S.rel&&!relBusy&&Date.now()>relNextTry&&queue.length-1-qpos<=3)extendRelated(false);
-  const lead=(iOS||S.fade<=0)?1:S.fade;
-  if(!hold&&rem<=lead&&!fading)goNext(false);
+  const lead=(iOS||S.fade<=0)?1.5:S.fade;
+  if(!hold&&rem<=lead&&!fading){switchDeadline=Date.now()+Math.max(0,rem)*1000;goNext(false)}
 },200);
 
 /* ---- メドレーの保存・切り替え・共有 ---- */
@@ -764,7 +817,7 @@ function setTab(t){
   if(t==='search'&&curTab!=='search')prevTab=curTab;
   curTab=t;
   $('#t-med').hidden=t!=='med';$('#t-rel').hidden=t!=='rel';$('#t-quiz').hidden=!q;$('#t-search').hidden=t!=='search';
-  document.body.classList.toggle('q',q);document.body.classList.remove('side-open');
+  document.body.classList.toggle('q',q);document.body.classList.toggle('search-open',t==='search');document.body.classList.remove('side-open');
   ['med','rel','quiz'].forEach(k=>$('#tab-'+k).setAttribute('aria-selected',String(k===t)));
   window.scrollTo(0,0);
 }
@@ -818,9 +871,16 @@ function qquestion(){
   if(qEndless&&qItems.length-qAsked.size<4)qExtend();
 }
 const qNextBtn=()=>{const b=$('#qnext');b.hidden=false;b.textContent=(qEndless||qi+1<qs.length)?'次の問題へ':'結果を見る'};
+let qRemain=0,qT0=0,qTimerOn=false;
+function qStopLimited(){qlimited=false;qTimerOn=false;try{P().pauseVideo()}catch(x){}}
 function quizState(e){
   if(!qOn)return;
-  if(e.data===1&&qlimited&&!qstarted){qstarted=true;qtimer=setTimeout(()=>{qlimited=false;try{P().pauseVideo()}catch(x){}},qdur*1000)}
+  if(e.data===1&&qlimited){
+    if(!qstarted){qstarted=true;qRemain=qdur*1000}
+    if(!qTimerOn){qTimerOn=true;qT0=Date.now();clearTimeout(qtimer);qtimer=setTimeout(qStopLimited,qRemain)}
+  }else if(e.data===2&&qlimited&&qTimerOn){
+    clearTimeout(qtimer);qRemain-=Date.now()-qT0;qTimerOn=false;
+  }
 }
 function quizErr(){
   if(qans)return;
@@ -831,7 +891,7 @@ function quizErr(){
 $('#qlisten').onclick=()=>{
   if(!qOn||qans)return;
   const t=qs[qi],p=P();
-  clearTimeout(qtimer);qstarted=false;qlimited=true;
+  clearTimeout(qtimer);qstarted=false;qTimerOn=false;qlimited=true;
   p.setVolume(VOL);p.loadVideoById({videoId:t.id,startSeconds:(qmode==='list'||qmode==='relstart')?t.start:0});
   $('#qlisten').textContent='↻ もう一度聞く';$('#qfb').textContent='';
   $('#qch').querySelectorAll('.choice').forEach(b=>b.disabled=false);
@@ -1271,15 +1331,16 @@ function doSearch(q){
 /* ---- 検索候補と履歴 ---- */
 let hist=[];try{hist=JSON.parse(localStorage.getItem('medley-hist')||'[]')}catch(e){}
 function addHist(q){hist=[q,...hist.filter(x=>x!==q)].slice(0,30);try{localStorage.setItem('medley-hist',JSON.stringify(hist))}catch(e){}}
-let sugItems=[],sugSel=-1,sugReq=0,sugTimer=null,sugRemote=[];
+let sugItems=[],sugSel=-1,sugReq=0,sugTimer=null,sugRemote=[],sugOrig='';
 function hideSug(){$('#sug').hidden=true;sugSel=-1}
+const hl=(t,q)=>(q&&t.toLowerCase().startsWith(q.toLowerCase()))?esc(t.slice(0,q.length))+'<b>'+esc(t.slice(q.length))+'</b>':'<b>'+esc(t)+'</b>';
 function renderSug(){
   const q=$('#sq').value.trim(),box=$('#sug');
   const h=(q?hist.filter(x=>x.toLowerCase().includes(q.toLowerCase())):hist).slice(0,q?4:10);
-  const remote=(q?sugRemote:[]).filter(x=>!h.includes(x)).slice(0,10);
+  const remote=(q?sugRemote:[]).filter(x=>!h.includes(x)).slice(0,13-h.length);
   sugItems=[...h.map(t=>({t,h:true})),...remote.map(t=>({t,h:false}))];
   if(!sugItems.length){hideSug();return}
-  box.innerHTML=sugItems.map((x,i)=>`<div class="sgi${i===sugSel?' on':''}" data-i="${i}" role="option"><span class="ico2">${x.h?'🕘':'🔍'}</span><span class="sgt">${esc(x.t)}</span>${x.h?'<button class="sgx" data-del="'+i+'" aria-label="履歴から削除">×</button>':''}</div>`).join('');
+  box.innerHTML=sugItems.map((x,i)=>`<div class="sgi${i===sugSel?' on':''}" data-i="${i}" role="option"><span class="ico2">${x.h?'🕘':'🔍'}</span><span class="sgt">${hl(x.t,q)}</span>${x.h?'<button class="sgx" data-del="'+i+'" aria-label="履歴から削除">×</button>':''}<button class="sgf" data-fill="${i}" aria-label="検索ボックスに入れる">↖</button></div>`).join('');
   box.hidden=false;
 }
 function fetchSug(q){
@@ -1300,8 +1361,12 @@ $('#sq').addEventListener('keydown',e=>{
   const box=$('#sug');
   if((e.key==='ArrowDown'||e.key==='ArrowUp')&&!box.hidden&&sugItems.length){
     e.preventDefault();
+    const was=sugSel;
     sugSel=e.key==='ArrowDown'?Math.min(sugItems.length-1,sugSel+1):Math.max(-1,sugSel-1);
+    if(was===-1&&sugSel>=0)sugOrig=$('#sq').value;
     box.querySelectorAll('.sgi').forEach((el,i)=>el.classList.toggle('on',i===sugSel));
+    $('#sq').value=sugSel>=0?sugItems[sugSel].t:sugOrig;
+    $('#sclr').hidden=!$('#sq').value;
     return;
   }
   if(e.key==='Escape'){hideSug();return}
@@ -1322,6 +1387,13 @@ $('#sq').addEventListener('input',()=>{
 $('#sq').addEventListener('focus',renderSug);
 $('#sq').addEventListener('click',renderSug);
 $('#sug').addEventListener('click',e=>{
+  const fill=e.target.closest('[data-fill]');
+  if(fill){
+    e.stopPropagation();
+    const it=sugItems[+fill.dataset.fill];
+    if(it){$('#sq').value=it.t;$('#sq').focus();$('#sq').dispatchEvent(new Event('input'))}
+    return;
+  }
   const del=e.target.closest('[data-del]');
   if(del){
     e.stopPropagation();
@@ -1375,6 +1447,18 @@ function pvPlay(from){
 function updatePvAdd(){
   const has=!!pvs&&tracks.some(t=>t.id===pvs.id),b=$('#pvadd');
   b.textContent=has?'✓ 追加済み':'＋ メドレーに追加';b.disabled=has;
+}
+function refreshAdded(){
+  document.querySelectorAll('#sres .sr').forEach(row=>{
+    const has=tracks.some(t=>t.id===row.dataset.id),b=row.querySelector('.sradd');
+    if(b){b.disabled=has;b.textContent=has?'✓ 追加済み':'＋追加'}
+  });
+  if(document.body.classList.contains('cse-show')){
+    document.querySelectorAll('.cse-badge').forEach(x=>x.remove());
+    document.querySelectorAll('.cse-added').forEach(x=>x.classList.remove('cse-added'));
+    markAllAdded();
+  }
+  updatePvAdd();
 }
 function addSearchResult(r,row){
   if(tracks.some(t=>t.id===r.id)){toast('すでにメドレーにある曲です。');markAdded(row);return}
@@ -1501,12 +1585,15 @@ function placeNp(){
 function renderNp(){
   if(!document.body.classList.contains('np-open'))return;
   if(queue.length!==tracks.length)resetBag();
-  const t=tracks[idx];
-  $('#npcur').textContent=t?(t.title||t.id):'再生していません';
+  const t=tracks[idx],l=lists.find(x=>x.id===lid);
+  $('#npt').textContent=t?(t.title||t.id):'再生していません';
+  $('#nps').textContent=t?(idx+1)+'/'+tracks.length+'曲 ・ '+fmt(t.start)+'から'+t.len+'秒':'';
+  $('#npcur').textContent=l?l.name:'';
   $('#npauto').checked=!!S.rel;
+  $('#npshuf').classList.toggle('on',!!S.shuffle);$('#nploop').classList.toggle('on',!!S.loop);
   $('#nplist').innerHTML=queue.slice(Math.max(qpos,0)).map(i=>{
     const x=tracks[i];
-    return `<div class="npi${i===idx?' on':''}" data-i="${i}"><img src="https://i.ytimg.com/vi/${x.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="npt"><span class="stt">${esc(x.title||x.id)}</span><span class="scn">${fmt(x.start)}から${x.len}秒</span></div></div>`;
+    return `<div class="npi${i===idx?' on':''}" data-i="${i}"><span class="npth"><img src="https://i.ytimg.com/vi/${x.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></span><div class="npt"><span class="stt">${esc(x.title||x.id)}</span><span class="scn">${fmt(x.start)}から${x.len}秒</span></div></div>`;
   }).join('')||'<p class="empty" style="padding:12px">曲がありません。</p>';
 }
 function openNp(){
@@ -1516,6 +1603,19 @@ function openNp(){
 }
 function closeNp(){clearTimeout(npT);document.body.classList.remove('np-open','np-ready')}
 $('#npclose').onclick=closeNp;
+$('#npclose2').onclick=closeNp;
+let npDrag=false;
+$('#npprev').onclick=()=>step(-1);
+$('#npnext').onclick=()=>step(1);
+$('#nppp').onclick=()=>$('#pp').click();
+$('#npshuf').onclick=()=>{S.shuffle=!S.shuffle;$('#shuffle').checked=S.shuffle;resetBag();save();render()};
+$('#nploop').onclick=()=>{S.loop=!S.loop;$('#loop').checked=S.loop;save();renderNp()};
+$('#npseek').addEventListener('input',()=>{npDrag=true;$('#npel').textContent=fmt(+$('#npseek').value)});
+$('#npseek').addEventListener('change',()=>{
+  npDrag=false;const t=tracks[idx];
+  if(!t||!armed)return;
+  P().seekTo(t.start+(+$('#npseek').value),true);P().playVideo();
+});
 $('#npauto').onchange=e=>{S.rel=e.target.checked;save();renderRel()};
 $('#nplist').addEventListener('click',e=>{
   const r=e.target.closest('.npi');if(!r)return;
@@ -1568,6 +1668,14 @@ $('#lenp5').onclick=()=>{if(tracks[idx])setLen(tracks[idx].len+5)};
 
 $('#pp').onclick=()=>{
   pvStop();
+  if(document.body.classList.contains('q')){
+    if(!qOn||players.length<2)return;
+    const st=P().getPlayerState();
+    if(st===1)P().pauseVideo();
+    else if(st===2&&(qlimited||qans))P().playVideo();
+    else if(!qans)$('#qlisten').click();
+    return;
+  }
   if(players.length<2){alert('プレーヤーを準備中です。少し待ってからもう一度押してください。');return}
   if(!tracks.length){alert('先に曲を追加してください。');return}
   if(idx<0||!running){if(idx<0){if(queue.length!==tracks.length)resetBag();cutTo(queue[0])}else cutTo(idx);return}
