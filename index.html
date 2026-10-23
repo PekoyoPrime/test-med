@@ -225,6 +225,20 @@ body.search-open #sclose{display:inline-flex;align-items:center}
   #npclose{display:none}
   body.np-open.np-ready .players>.pw.cur{z-index:56}
 }
+button.nptab{background:transparent;color:var(--mute);border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 10px;font-weight:600}
+button.nptab.on{color:var(--ink);border-bottom-color:var(--ink)}
+#npq,#nplyr{flex:1;min-height:0;display:flex;flex-direction:column}
+.lyrbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;flex-wrap:wrap}
+.lyrctl{display:flex;align-items:center;gap:6px}
+.lyrctl button{padding:6px 10px}
+#lyrbox{flex:1;min-height:0;overflow-y:auto;padding:12px 16px 80px}
+.ll{margin:0 0 18px;font-size:22px;line-height:1.5;font-weight:700;color:rgba(255,255,255,.4);overflow-wrap:anywhere}
+.ll.cur{color:transparent;background:linear-gradient(90deg,#fff var(--p,0%),rgba(255,255,255,.55) var(--p,0%));-webkit-background-clip:text;background-clip:text}
+.lyrplain{white-space:pre-wrap;line-height:1.9;color:var(--ink)}
+@media (max-width:899px){
+  #npq,#nplyr{display:block;flex:none}
+  #lyrbox{overflow:visible}
+}
 </style>
 </head>
 <body>
@@ -411,10 +425,19 @@ body.search-open #sclose{display:inline-flex;align-items:center}
     </div>
   </div>
   <div id="npside">
-    <div class="nptabs"><span class="nptab">次のコンテンツ</span><button class="ghost" id="npclose" aria-label="閉じる">⌄</button></div>
-    <div class="npnow"><div class="lab" style="margin:0">再生中</div><div id="npcur" class="npcur"></div></div>
-    <label class="npauto"><span><b>自動再生</b><br><small>関連曲をリストの最後に自動で追加します</small></span><input id="npauto" type="checkbox"></label>
-    <div id="nplist"></div>
+    <div class="nptabs"><button class="nptab on" data-tab="q">次のコンテンツ</button><button class="nptab" data-tab="l">歌詞</button><button class="ghost" id="npclose" aria-label="閉じる">⌄</button></div>
+    <div id="npq">
+      <div class="npnow"><div class="lab" style="margin:0">再生中</div><div id="npcur" class="npcur"></div></div>
+      <label class="npauto"><span><b>自動再生</b><br><small>関連曲をリストの最後に自動で追加します</small></span><input id="npauto" type="checkbox"></label>
+      <div id="nplist"></div>
+    </div>
+    <div id="nplyr" hidden>
+      <div class="lyrbar">
+        <span id="lyrstat" class="empty"></span>
+        <span class="lyrctl"><button class="ghost" id="lyrm" title="歌詞を遅らせる（−0.5秒）">−0.5</button><span id="lyroff" class="empty">0.0</span><button class="ghost" id="lyrp" title="歌詞を早める（＋0.5秒）">＋0.5</button><button class="ghost" id="lyrre">探し直す</button></span>
+      </div>
+      <div id="lyrbox"></div>
+    </div>
   </div>
 </div>
 <div id="toast" hidden role="status" aria-live="polite"></div>
@@ -1587,21 +1610,158 @@ function renderNp(){
   if(queue.length!==tracks.length)resetBag();
   const t=tracks[idx],l=lists.find(x=>x.id===lid);
   $('#npt').textContent=t?(t.title||t.id):'再生していません';
-  $('#nps').textContent=t?(idx+1)+'/'+tracks.length+'曲 ・ '+fmt(t.start)+'から'+t.len+'秒':'';
+  $('#nps').textContent=t?(idx+1)+'/'+tracks.length+'曲':'';
   $('#npcur').textContent=l?l.name:'';
   $('#npauto').checked=!!S.rel;
   $('#npshuf').classList.toggle('on',!!S.shuffle);$('#nploop').classList.toggle('on',!!S.loop);
   $('#nplist').innerHTML=queue.slice(Math.max(qpos,0)).map(i=>{
     const x=tracks[i];
-    return `<div class="npi${i===idx?' on':''}" data-i="${i}"><span class="npth"><img src="https://i.ytimg.com/vi/${x.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></span><div class="npt"><span class="stt">${esc(x.title||x.id)}</span><span class="scn">${fmt(x.start)}から${x.len}秒</span></div></div>`;
+    return `<div class="npi${i===idx?' on':''}" data-i="${i}"><span class="npth"><img src="https://i.ytimg.com/vi/${x.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></span><div class="npt"><span class="stt">${esc(x.title||x.id)}</span></div></div>`;
   }).join('')||'<p class="empty" style="padding:12px">曲がありません。</p>';
+  if(npTab==='l')ensureLyrics();
 }
+/* ---- 歌詞（LRCLIB）と、歌っている部分のハイライト ---- */
+let npTab='q',lyr={id:null,lines:[],plain:'',cur:-1,name:''},lyrOff={},lyrRaf=0,lyrUserScroll=0,lyrBase={ct:-1,w:0},lyrReq=0;
+try{lyrOff=JSON.parse(localStorage.getItem('medley-lyroff')||'{}')}catch(e){}
+const lyrCache=new Map();
+const lyrNorm=x=>(x||'').toLowerCase().replace(/[\s\-–—_/・:：|｜「」『』【】\[\]()（）~～〜"'.,!?！？]+/g,'');
+function lyricQueries(title,author){
+  const out=[];
+  const clean=x=>x.replace(/[【\[(（][^】\])）]*[】\])）]/g,' ').replace(/\b(official( music)? video|official|music video|mv|lyric video|lyrics?|audio|full ver\.?|short ver\.?)\b/ig,' ').replace(/\s+/g,' ').trim();
+  const q1=title.match(/[「『]([^」』]+)[」』]/);
+  if(q1)out.push(q1[1]);
+  const c=clean(title);
+  if(c)out.push(c);
+  const parts=c.split(/\s+[-–—／/|｜]\s+|\s*[／/]\s*/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length>1)parts.forEach(p=>out.push(p));
+  const art=(author||'').replace(/\s*-\s*Topic$/i,'').replace(/(VEVO|公式|official|channel|チャンネル)/ig,'').trim();
+  if(art&&c)out.push(c+' '+art);
+  return [...new Set(out.filter(x=>x.length>1))].slice(0,5);
+}
+function lyricScore(r,ref,author,dur){
+  const nt=lyrNorm(ref),na=lyrNorm(author),tn=lyrNorm(r.trackName),an=lyrNorm(r.artistName);
+  let sc=0;
+  if(tn&&nt.includes(tn))sc+=4;
+  if(an&&(nt.includes(an)||na.includes(an)))sc+=3;
+  if(dur>0&&r.duration>0){const d=Math.abs(r.duration-dur);sc+=d<=3?5:d<=8?2:d<=20?0:-3}
+  if(r.syncedLyrics)sc+=3;
+  return sc;
+}
+function parseLrc(txt){
+  const out=[];
+  String(txt).split(/\r?\n/).forEach(line=>{
+    const tags=[...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    if(!tags.length)return;
+    const text=line.replace(/\[[^\]]*\]/g,'').trim();
+    tags.forEach(m=>out.push({t:(+m[1])*60+parseFloat(m[2]),s:text}));
+  });
+  return out.sort((a,b)=>a.t-b.t);
+}
+async function findLyrics(t,customQ){
+  const meta=await fetchMeta(t.id);
+  const title=customQ||t.title||meta.title||'',author=customQ?'':(meta.author||'');
+  let dur=0;try{if(P().getVideoData().video_id===t.id)dur=P().getDuration()}catch(e){}
+  const qs=customQ?[customQ]:lyricQueries(title,author);
+  let best=null,fails=0;
+  for(const q of qs){
+    let arr=[];
+    try{const r=await fetch('https://lrclib.net/api/search?q='+encodeURIComponent(q));if(r.ok)arr=await r.json();else fails++}catch(e){fails++}
+    for(const r of (Array.isArray(arr)?arr:[])){
+      if(!r.syncedLyrics&&!r.plainLyrics)continue;
+      const sc=lyricScore(r,title,author,dur);
+      if(!best||sc>best.sc)best={sc,r};
+    }
+    if(best&&best.sc>=9&&best.r.syncedLyrics)break;
+  }
+  if(!best&&fails&&fails===qs.length)throw new Error('net');
+  if(!best||best.sc<2)return null;
+  const r=best.r;
+  return {name:r.trackName+' / '+r.artistName,lines:r.syncedLyrics?parseLrc(r.syncedLyrics):[],plain:r.plainLyrics||''};
+}
+const setLyrStatus=x=>{$('#lyrstat').textContent=x};
+function renderLyr(){
+  const box=$('#lyrbox');
+  if(lyr.lines.length)box.innerHTML=lyr.lines.map((l,i)=>`<p class="ll" data-i="${i}">${esc(l.s)||'♪'}</p>`).join('');
+  else if(lyr.plain)box.innerHTML='<div class="lyrplain">'+esc(lyr.plain)+'</div>';
+  else box.innerHTML='';
+  lyr.cur=-1;
+  $('#lyroff').textContent='補正 '+(lyrOff[lyr.id]||0).toFixed(1)+'秒';
+}
+async function ensureLyrics(force,customQ){
+  const t=tracks[idx];
+  if(!t){setLyrStatus('再生中の曲がありません。');return}
+  if(!force&&lyr.id===t.id)return;
+  const my=++lyrReq;
+  lyr={id:t.id,lines:[],plain:'',cur:-1,name:''};renderLyr();
+  setLyrStatus('歌詞を探しています…');
+  let res=customQ?null:lyrCache.get(t.id);
+  if(!res){
+    try{res=await findLyrics(t,customQ)}
+    catch(e){if(my===lyrReq)setLyrStatus('歌詞サービス（LRCLIB）に接続できませんでした。');return}
+    if(my!==lyrReq)return;
+    if(res)lyrCache.set(t.id,res);
+  }
+  if(!res){setLyrStatus('歌詞が見つかりませんでした。「探し直す」で曲名を入力できます。');return}
+  lyr={id:t.id,lines:res.lines,plain:res.plain,cur:-1,name:res.name};
+  setLyrStatus('「'+res.name+'」'+(res.lines.length?'':'（同期なし・歌詞のみ）'));
+  renderLyr();lyrLoop();
+}
+function lyrTick(){
+  let ct=0,playing=false;
+  try{ct=P().getCurrentTime();playing=P().getPlayerState()===1}catch(e){return}
+  const now=performance.now();
+  if(ct!==lyrBase.ct)lyrBase={ct,w:now};
+  const t=ct+(playing?(now-lyrBase.w)/1000:0)+(lyrOff[lyr.id]||0),L=lyr.lines;
+  let lo=0,hi=L.length-1,i=-1;
+  while(lo<=hi){const m=(lo+hi)>>1;if(L[m].t<=t){i=m;lo=m+1}else hi=m-1}
+  const els=$('#lyrbox').children;
+  if(i!==lyr.cur){
+    if(lyr.cur>=0&&els[lyr.cur]){els[lyr.cur].classList.remove('cur');els[lyr.cur].style.removeProperty('--p')}
+    lyr.cur=i;
+    if(i>=0&&els[i]){
+      els[i].classList.add('cur');
+      if(Date.now()-lyrUserScroll>3000)els[i].scrollIntoView({block:'center',behavior:'smooth'});
+    }
+  }
+  if(i>=0&&els[i]){
+    const nx2=L[i+1],len=Math.max(0.5,Math.min(nx2?nx2.t-L[i].t:4,Math.max(2,(L[i].s.length||1)*0.3)));
+    els[i].style.setProperty('--p',(Math.max(0,Math.min(1,(t-L[i].t)/len))*100).toFixed(1)+'%');
+  }
+}
+function lyrLoop(){
+  if(window.cancelAnimationFrame)cancelAnimationFrame(lyrRaf);
+  if(!document.body.classList.contains('np-open')||npTab!=='l'||!lyr.lines.length||!window.requestAnimationFrame)return;
+  const step=()=>{lyrTick();lyrRaf=requestAnimationFrame(step)};
+  lyrRaf=requestAnimationFrame(step);
+}
+function setNpTab(t){
+  npTab=t;
+  document.querySelectorAll('.nptab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  $('#npq').hidden=t!=='q';$('#nplyr').hidden=t!=='l';
+  if(t==='l'){ensureLyrics();lyrLoop()}else if(window.cancelAnimationFrame)cancelAnimationFrame(lyrRaf);
+}
+document.querySelectorAll('.nptab').forEach(b=>{b.onclick=()=>setNpTab(b.dataset.tab)});
+function lyrShift(d){
+  const t=tracks[idx];if(!t)return;
+  lyrOff[t.id]=Math.round(((lyrOff[t.id]||0)+d)*10)/10;
+  try{localStorage.setItem('medley-lyroff',JSON.stringify(lyrOff))}catch(e){}
+  $('#lyroff').textContent='補正 '+lyrOff[t.id].toFixed(1)+'秒';
+}
+$('#lyrm').onclick=()=>lyrShift(-0.5);
+$('#lyrp').onclick=()=>lyrShift(0.5);
+$('#lyrre').onclick=()=>{
+  const t=tracks[idx];if(!t)return;
+  const q=prompt('歌詞を探す言葉（曲名 アーティスト名）',t.title||'');
+  if(q&&q.trim())ensureLyrics(true,q.trim());
+};
+['touchstart','wheel','mousedown'].forEach(ev=>$('#npside').addEventListener(ev,()=>{lyrUserScroll=Date.now()},{passive:true}));
+
 function openNp(){
   if(document.body.classList.contains('q'))return;
-  document.body.classList.add('np-open');renderNp();
+  document.body.classList.add('np-open');renderNp();lyrLoop();
   clearTimeout(npT);npT=setTimeout(()=>{placeNp();document.body.classList.add('np-ready')},330);
 }
-function closeNp(){clearTimeout(npT);document.body.classList.remove('np-open','np-ready')}
+function closeNp(){clearTimeout(npT);if(window.cancelAnimationFrame)cancelAnimationFrame(lyrRaf);document.body.classList.remove('np-open','np-ready')}
 $('#npclose').onclick=closeNp;
 $('#npclose2').onclick=closeNp;
 let npDrag=false;
