@@ -252,6 +252,17 @@ body.q #fullbtn,body.q #repbtn{display:none}
 .bar #fullbtn,#npfull{flex:none;white-space:nowrap}
 .bar #fullbtn.on,.bar #repbtn.on,#npfull.on{background:var(--ac);color:var(--ac-ink);border-color:var(--ac)}
 #npfull{padding:8px 12px}
+#tostart .ti{margin-right:4px}
+@media (max-width:600px){
+  .bar .in>.row{flex-wrap:nowrap;gap:4px}
+  .bar .in>.row>span.row{flex:1;flex-wrap:nowrap;justify-content:space-between}
+  .bar button{height:40px;padding:0 8px;min-width:0}
+  .bar button.ico{width:40px;height:40px;padding:0}
+  .bar #volbtn{width:40px;padding:0}
+  #tostart{width:40px;padding:0}
+  #tostart .ti{margin:0}
+  #tostart .tt{display:none}
+}
 </style>
 </head>
 <body>
@@ -260,7 +271,6 @@ body.q #fullbtn,body.q #repbtn{display:none}
   <div class="brand">♪ メドレーメーカー</div>
   <nav id="tabs" role="tablist">
     <button class="tab" id="tab-med" role="tab" aria-selected="true">🎵 メドレー</button>
-    <button class="tab" id="tab-rel" role="tab" aria-selected="false">🔗 関連メドレー</button>
     <button class="tab" id="tab-quiz" role="tab" aria-selected="false">❓ イントロクイズ</button>
   </nav>
   <button id="lnew" class="ghost">＋ 新しいメドレー</button>
@@ -309,6 +319,16 @@ body.q #fullbtn,body.q #repbtn{display:none}
 </section>
 
 <section>
+  <h2>関連曲</h2>
+  <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連する曲を集めます。「再生設定」の「関連曲を自動で追加」をオンにすると、曲が残り少なくなったときに、自動で足していきます。</p>
+  <div class="row"><button id="rmore" class="ghost">今すぐ関連曲を追加</button><button id="rlst" class="ghost">このメドレーの関連曲で新しいメドレー</button><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
+  <label class="lab" for="rseed">ある曲の関連曲で、新しいメドレーを作る（動画のURL）</label>
+  <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
+  <div class="row"><button id="rstart">この曲の関連曲で新しいメドレー</button></div>
+  <p class="empty" id="rmsg" style="margin:8px 0 0"></p>
+</section>
+
+<section>
   <div class="row" style="margin:0 0 8px;justify-content:space-between"><h2 style="margin:0">曲リスト</h2><button class="ghost" id="clearall">全曲を削除</button></div>
   <p class="empty" id="listnote" style="font-size:13px;margin:0 0 4px"></p>
   <div id="list"></div>
@@ -343,32 +363,6 @@ body.q #fullbtn,body.q #repbtn{display:none}
 <div id="gcse"></div>
 </div>
 
-<div id="t-rel" hidden>
-<section>
-  <h2>関連メドレー</h2>
-  <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連曲を集めて次々に再生します。最初の曲から2曲、その2曲からさらに2曲ずつ…と広げて、10曲集めます。以降は「自動で追加」や「今すぐ関連曲を追加」で増やせます。</p>
-  <label class="lab" for="rseed">最初の曲（動画のURL）</label>
-  <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
-  <div class="row"><button id="rstart">この曲の関連曲で再生</button></div>
-</section>
-<section>
-  <h2>曲リストに関連する動画から再生</h2>
-  <p class="empty" style="font-size:13px;margin:0 0 8px">左で選択中のメドレーの曲からランダムに10曲を選び、1曲につき2曲ずつ関連曲を集めて再生します。残りの曲は、「自動で追加」や「今すぐ関連曲を追加」で、1曲につき2曲ずつ順番に追加されます。リストの曲を使い切ったら、リストの曲と追加した曲からランダムに選びます。元の曲リストは変わりません。</p>
-  <p class="empty" id="rsrcinfo" style="margin:0 0 8px"></p>
-  <div class="row"><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
-  <div class="row"><button id="rlst">曲リストの関連曲で再生</button></div>
-  <p class="empty" id="rmsg" style="margin:8px 0 0"></p>
-  <p class="empty" style="font-size:12px;margin:6px 0 0">音楽以外の動画は、曲名・チャンネル名・長さから、できるだけ除いています（完全ではありません）。</p>
-</section>
-<section>
-  <h2>選択中のメドレー</h2>
-  <p class="empty" id="rinfo" style="margin:0 0 6px"></p>
-  <label><input id="rauto" type="checkbox" style="width:auto"> 曲が残り少なくなったら、関連曲を自動で追加する</label>
-  <div class="row"><button class="ghost" id="rmore">今すぐ関連曲を追加</button></div>
-  <div id="rlist"></div>
-</section>
-</div>
-
 <div id="t-quiz" hidden>
 <section id="qsetup">
   <h2>イントロクイズ</h2>
@@ -377,7 +371,7 @@ body.q #fullbtn,body.q #repbtn{display:none}
     <div class="row"><input class="grow" id="qlink" placeholder="共有リンクを貼り付け"><button id="qimp" class="ghost">取り込む</button></div>
   </details>
   <label class="lab" for="qmode">出題する場所</label>
-  <select id="qmode"><option value="intro">曲の最初（イントロ）</option><option value="list">リストの開始位置（サビなど）</option><option value="rel">関連メドレーからエンドレスに出題（曲の最初）</option><option value="relstart">関連メドレーからエンドレスに出題（開始位置から）</option></select>
+  <select id="qmode"><option value="intro">曲の最初（イントロ）</option><option value="list">リストの開始位置（サビなど）</option><option value="rel">関連曲からエンドレスに出題（曲の最初）</option><option value="relstart">関連曲からエンドレスに出題（開始位置から）</option></select>
   <label class="lab" for="qsec">再生する長さ（秒）</label>
   <select id="qsec"><option>3</option><option selected>5</option><option>8</option><option>10</option><option>15</option><option>30</option></select>
   <label class="lab" for="qn">問題数</label>
@@ -424,7 +418,7 @@ body.q #fullbtn,body.q #repbtn{display:none}
   <div id="nphead"><button class="ghost" id="npclose2" aria-label="閉じる">⌄</button><span class="nphd">再生中</span><span style="width:44px"></span></div>
   <div id="npmain">
     <div id="npstage"></div>
-    <div id="npinfo"><div class="npinrow"><div class="npinl"><div id="npt" class="npt2"></div><div id="nps" class="empty" style="margin:2px 0 0"></div></div><button class="ghost" id="npfull" aria-pressed="false">フル尺</button><button class="ghost" id="npstart">開始位置へ</button></div></div>
+    <div id="npinfo"><div class="npinrow"><div class="npinl"><div id="npt" class="npt2"></div><div id="nps" class="empty" style="margin:2px 0 0"></div></div><button class="ghost" id="npfull" aria-pressed="false">フル</button><button class="ghost" id="npstart">開始位置へ</button></div></div>
     <div id="npseekrow">
       <input id="npseek" type="range" min="0" max="30" step="0.1" value="0" aria-label="再生位置">
       <div class="npts"><span id="npel">0:00</span><span id="npdur">0:30</span></div>
@@ -460,11 +454,11 @@ body.q #fullbtn,body.q #repbtn{display:none}
   <input id="pseek" class="mc" type="range" min="0" max="100" step="0.1" value="0" aria-label="この曲の再生位置">
   <div class="row" style="margin:0">
     <span class="row" style="margin:0;gap:8px">
-      <button class="ghost" id="tostart" title="この曲の開始位置へ戻ります">開始位置へ</button>
+      <button class="ghost" id="tostart" title="この曲の開始位置へ戻ります" aria-label="開始位置へ"><span class="ti" aria-hidden="true">⟲</span><span class="tt">開始位置へ</span></button>
       <button class="ghost ico" id="prev" aria-label="前の曲" title="前の曲"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
       <button id="pp" class="ico" aria-label="再生" title="再生 / 一時停止"></button>
       <button class="ghost ico" id="next" aria-label="次の曲" title="次の曲"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
-      <button class="ghost" id="fullbtn" aria-pressed="false" title="フル尺で再生（最初から最後まで）">フル尺</button>
+      <button class="ghost" id="fullbtn" aria-pressed="false" title="フル：最初から最後まで再生">フル</button>
       <button class="ghost ico" id="repbtn" aria-label="リピート" title="リピート"></button>
     </span>
     <div id="volwrap">
@@ -795,7 +789,7 @@ function stopAll(){
   players.forEach(p=>{try{p.pauseVideo()}catch(e){}});
   setNow('停止中');$('#pseek').value=0;setPP(false);
 }
-function applyS(){$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle;$('#rauto').checked=!!S.rel}
+function applyS(){$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle;$('#medauto').checked=!!S.rel}
 function loadList(l){
   stopAll();lid=l.id;tracks=l.tracks;
   S=Object.assign({fade:3,ds:45,dl:30,loop:true,shuffle:false,rel:false,mix:false,one:false},l.S||{});
@@ -857,17 +851,15 @@ function setTab(t){
   if(t!=='search'){$('#pvpanel').hidden=true;if(cseReady){try{google.search.cse.element.getElement('medley').clearAllResults()}catch(e){}}}
   if(q){stopAll();qshow('qsetup');quizPrep()}
   else if(curTab==='quiz'){qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
-  if(t==='rel')renderRel();
   if(t==='search'&&curTab!=='search')prevTab=curTab;
   curTab=t;
-  $('#t-med').hidden=t!=='med';$('#t-rel').hidden=t!=='rel';$('#t-quiz').hidden=!q;$('#t-search').hidden=t!=='search';
+  $('#t-med').hidden=t!=='med';$('#t-quiz').hidden=!q;$('#t-search').hidden=t!=='search';
   document.body.classList.toggle('q',q);document.body.classList.toggle('search-open',t==='search');document.body.classList.remove('side-open');
-  ['med','rel','quiz'].forEach(k=>$('#tab-'+k).setAttribute('aria-selected',String(k===t)));
+  ['med','quiz'].forEach(k=>$('#tab-'+k).setAttribute('aria-selected',String(k===t)));
   window.scrollTo(0,0);
 }
 $('#sclose').onclick=closeSearch;
 $('#tab-med').onclick=()=>setTab('med');
-$('#tab-rel').onclick=()=>setTab('rel');
 $('#tab-quiz').onclick=()=>setTab('quiz');
 $('#qimp').onclick=()=>{
   const d=parseShare($('#qlink').value);
@@ -1180,7 +1172,6 @@ async function extendRelated(manual){
   finally{relBusy=false}
 }
 $('#rmore').onclick=()=>extendRelated(true);
-$('#rauto').onchange=e=>{S.rel=e.target.checked;save();renderRel();renderNp()};
 
 /* 長さが極端な動画（長編・短編）を自動で外す */
 const vetOK=new Set(),badDur=d=>d>0&&(d<40||d>(pmode?1200:720));
@@ -1212,18 +1203,7 @@ function vetCued(){
     if(badDur(d))removeTrack(i);
   });
 }
-function renderRel(){
-  const l=curList();
-  $('#rsrcinfo').textContent=l?'元になる曲リスト：左で選択中の「'+l.name+'」（'+l.tracks.length+'曲）':'';
-  $('#rinfo').textContent=l?'現在のメドレー：「'+l.name+'」'+tracks.length+'曲':'';
-  $('#rauto').checked=!!S.rel;$('#medauto').checked=!!S.rel;
-  $('#rlist').innerHTML=tracks.length?queue.map(i=>{const t=tracks[i];
-    return `<div class="rr${i===idx?' on':''}" data-i="${i}"><img src="https://i.ytimg.com/vi/${t.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div>${esc(t.title||t.id)}</div><button class="ghost" data-a="rplay" aria-label="この曲から再生">▶</button></div>`}).join(''):'<p class="empty">まだ曲がありません。</p>';
-}
-$('#rlist').addEventListener('click',e=>{
-  const b=e.target.closest('[data-a="rplay"]');if(!b)return;
-  running=true;cutTo(+b.closest('.rr').dataset.i);
-});
+function renderRel(){$('#medauto').checked=!!S.rel}
 
 /* ---- 検索（Googleカスタム検索）・結果カード・プレビュー・追加 ---- */
 const CSE_ID='f0875449847e94ae8';
@@ -1887,7 +1867,7 @@ $('#nplist').addEventListener('click',e=>{
 document.querySelector('.bar').addEventListener('click',e=>{
   if(e.target.closest('button,input,select,a,#volpop'))return;
   document.body.classList.contains('np-open')?closeNp():openNp();
-});
+},true);
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     const npo=document.body.classList.contains('np-open');
@@ -1913,7 +1893,7 @@ function setPmode(on){
   const changed=pmode!==!!on;pmode=!!on;
   try{localStorage.setItem('medley-full',pmode?'1':'0')}catch(e){}
   const lab=pmode?'最初へ':'開始位置へ';
-  $('#tostart').textContent=lab;$('#npstart').textContent=lab;
+  {const tt=$('#tostart').querySelector('.tt');if(tt)tt.textContent=lab}$('#npstart').textContent=lab;
   [$('#fullbtn'),$('#npfull')].forEach(b=>{if(b){b.classList.toggle('on',pmode);b.setAttribute('aria-pressed',String(pmode))}});
   if(changed){loaded=loaded.map((v,k)=>k===cur?v:-1);renderNp()}
 }
@@ -1922,7 +1902,8 @@ function syncRep(){
   const on=!!(S.loop||S.one);
   [$('#nploop'),$('#repbtn')].forEach(b=>{
     if(!b)return;
-    b.innerHTML=S.one?ICON_REP1:ICON_REP;b.classList.toggle('on',on);
+    const ic=S.one?'1':'0';if(b.dataset.ic!==ic){b.dataset.ic=ic;b.innerHTML=S.one?ICON_REP1:ICON_REP}
+    b.classList.toggle('on',on);
     b.setAttribute('aria-label',repLabel());b.title=repLabel();
   });
   $('#loop').checked=!!S.loop;$('#one').checked=!!S.one;
