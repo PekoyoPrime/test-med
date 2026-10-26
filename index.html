@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>メドレーメーカー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#030303">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
 :root{--bg:#e9eef2;--sf:#fff;--ink:#16202b;--mute:#5d6b78;--ac:#0b7a75;--ac-ink:#fff;--hot:#e39b00;--line:#cfd8df;--ok:#1c8a4a;--ng:#c43d3d}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1a22;--sf:#16252f;--ink:#e6eef3;--mute:#8da0ae;--ac:#3cc3b8;--ac-ink:#06201e;--hot:#f2b93b;--line:#28404e;--ok:#4ed08a;--ng:#ff7b7b}}
@@ -263,6 +268,13 @@ body.q #fullbtn,body.q #repbtn{display:none}
   #tostart .ti{margin:0}
   #tostart .tt{display:none}
 }
+#npclose{display:none}
+.bar #npbtn{position:absolute;right:16px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:2}
+#npbtn svg{display:block;transition:transform .25s}
+body.np-open #npbtn svg{transform:rotate(180deg)}
+body.q #npbtn{display:none}
+@media (max-width:899px){.bar #npbtn{display:none}}
+#pwa{margin:6px 6px 0;border-radius:20px;padding:8px 14px}
 </style>
 </head>
 <body>
@@ -275,6 +287,7 @@ body.q #fullbtn,body.q #repbtn{display:none}
   </nav>
   <button id="lnew" class="ghost">＋ 新しいメドレー</button>
   <button id="limp" class="ghost">共有リンクから取り込む</button>
+  <button id="pwa" class="ghost" hidden>ホーム画面に追加</button>
   <div id="plist"></div>
 </aside>
 <div id="scrim"></div>
@@ -321,7 +334,7 @@ body.q #fullbtn,body.q #repbtn{display:none}
 <section>
   <h2>関連曲</h2>
   <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連する曲を集めます。「再生設定」の「関連曲を自動で追加」をオンにすると、曲が残り少なくなったときに、自動で足していきます。</p>
-  <div class="row"><button id="rmore" class="ghost">今すぐ関連曲を追加</button><button id="rlst" class="ghost">このメドレーの関連曲で新しいメドレー</button><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
+  <div class="row"><button id="rmore" class="ghost">今すぐ関連曲を追加</button><button id="chall" class="ghost">全曲のサビを歌詞から設定</button><button id="rlst" class="ghost">このメドレーの関連曲で新しいメドレー</button><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
   <label class="lab" for="rseed">ある曲の関連曲で、新しいメドレーを作る（動画のURL）</label>
   <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
   <div class="row"><button id="rstart">この曲の関連曲で新しいメドレー</button></div>
@@ -377,7 +390,21 @@ body.q #fullbtn,body.q #repbtn{display:none}
   <label class="lab" for="qn">問題数</label>
   <select id="qn"></select>
   <p class="empty" id="qmsg"></p>
+  <details style="margin-top:14px"><summary>オンライン対戦（ベータ）</summary>
+    <p class="empty" style="font-size:13px;margin:8px 0">部屋を作った人（ホスト）の、左で選択中のメドレーから出題します。出題する場所と再生秒数は、上の設定を使います。全員が自分の端末で再生します。</p>
+    <div class="row"><button id="oqhost">部屋を作る</button></div>
+    <div class="row"><input class="grow" id="oqcode" placeholder="部屋コード（5文字）" maxlength="8" autocomplete="off"><button id="oqjoin" class="ghost">参加</button></div>
+    <p class="empty" id="oqmsg" style="margin:8px 0 0"></p>
+  </details>
   <div class="row"><button id="qstart">クイズを始める</button></div>
+</section>
+<section id="oqgame" hidden>
+  <h2 id="oqhead">オンライン対戦</h2>
+  <div id="oqstat" class="empty"></div>
+  <div class="row"><button id="oqstart" hidden>全員で始める</button><button id="oqlisten" class="ghost" hidden>▶ 聞く</button><button id="oqleave" class="ghost">退出</button></div>
+  <div id="oqch"></div>
+  <p id="oqfb" style="font-weight:700"></p>
+  <div id="oqscore"></div>
 </section>
 <section id="qgame" hidden>
   <h2 id="qno"></h2>
@@ -418,7 +445,7 @@ body.q #fullbtn,body.q #repbtn{display:none}
   <div id="nphead"><button class="ghost" id="npclose2" aria-label="閉じる">⌄</button><span class="nphd">再生中</span><span style="width:44px"></span></div>
   <div id="npmain">
     <div id="npstage"></div>
-    <div id="npinfo"><div class="npinrow"><div class="npinl"><div id="npt" class="npt2"></div><div id="nps" class="empty" style="margin:2px 0 0"></div></div><button class="ghost" id="npfull" aria-pressed="false">フル</button><button class="ghost" id="npstart">開始位置へ</button></div></div>
+    <div id="npinfo"><div class="npinrow"><div class="npinl"><div id="npt" class="npt2"></div><div id="nps" class="empty" style="margin:2px 0 0"></div></div><button class="ghost" id="npinst">インスト</button><button class="ghost" id="npfull" aria-pressed="false">フル</button><button class="ghost" id="npstart">開始位置へ</button></div></div>
     <div id="npseekrow">
       <input id="npseek" type="range" min="0" max="30" step="0.1" value="0" aria-label="再生位置">
       <div class="npts"><span id="npel">0:00</span><span id="npdur">0:30</span></div>
@@ -441,7 +468,7 @@ body.q #fullbtn,body.q #repbtn{display:none}
     <div id="nplyr" hidden>
       <div class="lyrbar">
         <span id="lyrstat" class="empty"></span>
-        <span class="lyrctl"><button class="ghost" id="lyrm" title="歌詞を遅らせる（−0.5秒）">−0.5</button><span id="lyroff" class="empty">0.0</span><button class="ghost" id="lyrp" title="歌詞を早める（＋0.5秒）">＋0.5</button><button class="ghost" id="lyrre">探し直す</button></span>
+        <span class="lyrctl"><button class="ghost" id="lyrm" title="歌詞を遅らせる（−0.5秒）">−0.5</button><span id="lyroff" class="empty">0.0</span><button class="ghost" id="lyrp" title="歌詞を早める（＋0.5秒）">＋0.5</button><button class="ghost" id="lyrchorus">サビを開始位置に</button><button class="ghost" id="lyrre">探し直す</button></span>
       </div>
       <div id="lyrbox"></div>
     </div>
@@ -469,7 +496,9 @@ body.q #fullbtn,body.q #repbtn{display:none}
       </div>
     </div>
   </div>
-</div></div>
+</div>
+<button class="ghost ico" id="npbtn" aria-label="再生中の画面を開く／閉じる" title="再生中の画面を開く／閉じる"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg></button>
+</div>
 
 <script>
 const $=s=>document.querySelector(s);
@@ -834,7 +863,7 @@ $('#clearall').onclick=()=>{
 let qOn=false,qItems=[],qs=[],qi=0,qscore=0,qlog=[],qlimited=false,qstarted=false,qans=false,qtimer=null,qdur=5,qmode='intro';
 let qEndless=false,qrel={src:[],used:[]},qTitles=new Set(),qAsked=new Set(),qBusy=false;
 const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-const qshow=id=>['qsetup','qgame','qresult'].forEach(k=>$('#'+k).hidden=k!==id);
+const qshow=id=>{['qsetup','qgame','qresult'].forEach(k=>$('#'+k).hidden=k!==id);$('#oqgame').hidden=true};
 function qInfo(){const l=curList();if(l)$('#qinfo').textContent='現在のメドレー：「'+l.name+'」'+tracks.length+'曲（切り替えは「メドレー」タブで）'}
 function quizPrep(){
   const max=tracks.length,opts=[5,10,20,50].filter(v=>v<max);if(max>=2)opts.push(max);
@@ -847,8 +876,9 @@ let curTab='med',prevTab='med';
 function closeSearch(){setTab(prevTab&&prevTab!=='search'?prevTab:'med')}
 function setTab(t){
   const q=t==='quiz';
+  if(!q)oqLeave();
   pvStop();closeNp();
-  if(t!=='search'){$('#pvpanel').hidden=true;if(cseReady){try{google.search.cse.element.getElement('medley').clearAllResults()}catch(e){}}}
+  if(t!=='search'){swapIdx=-1;$('#pvpanel').hidden=true;if(cseReady){try{google.search.cse.element.getElement('medley').clearAllResults()}catch(e){}}}
   if(q){stopAll();qshow('qsetup');quizPrep()}
   else if(curTab==='quiz'){qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
   if(t==='search'&&curTab!=='search')prevTab=curTab;
@@ -1252,7 +1282,7 @@ function scrapeCse(){
 }
 function cardHTML(r){
   const has=tracks.some(t=>t.id===r.id);
-  return `<div class="sr" data-id="${r.id}"><img src="https://i.ytimg.com/vi/${r.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="srinfo"><span class="srt">${esc(r.title)}</span><span class="srs">${esc(r.snip)}</span><span class="srd"></span></div><div class="srbtn"><button class="ghost srplay" data-a="rplay" aria-label="試聴">▶</button><button class="sradd" data-a="radd"${has?' disabled':''}>${has?'✓ 追加済み':'＋追加'}</button></div><div class="srbar"><input type="range" class="srp" min="0" max="${S.dl}" step="0.1" value="0" aria-label="試聴位置"><span class="srtime">0:00 / ${fmt(S.dl)}</span></div></div>`;
+  return `<div class="sr" data-id="${r.id}"><img src="https://i.ytimg.com/vi/${r.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="srinfo"><span class="srt">${esc(r.title)}</span><span class="srs">${esc(r.snip)}</span><span class="srd"></span></div><div class="srbtn"><button class="ghost srplay" data-a="rplay" aria-label="試聴">▶</button><button class="sradd" data-a="radd"${has&&swapIdx<0?' disabled':''}>${swapIdx>=0?'置き換え':(has?'✓ 追加済み':'＋追加')}</button></div><div class="srbar"><input type="range" class="srp" min="0" max="${S.dl}" step="0.1" value="0" aria-label="試聴位置"><span class="srtime">0:00 / ${fmt(S.dl)}</span></div></div>`;
 }
 function setRowPlaying(row,on){const b=row&&row.querySelector('.srplay');if(b)b.textContent=on?'■':'▶'}
 function resetRowUI(row){
@@ -1475,7 +1505,7 @@ function updatePvAdd(){
 function refreshAdded(){
   document.querySelectorAll('#sres .sr').forEach(row=>{
     const has=tracks.some(t=>t.id===row.dataset.id),b=row.querySelector('.sradd');
-    if(b){b.disabled=has;b.textContent=has?'✓ 追加済み':'＋追加'}
+    if(b){const sw=swapIdx>=0;b.disabled=has&&!sw;b.textContent=sw?'置き換え':(has?'✓ 追加済み':'＋追加')}
   });
   if(document.body.classList.contains('cse-show')){
     document.querySelectorAll('.cse-badge').forEach(x=>x.remove());
@@ -1485,6 +1515,11 @@ function refreshAdded(){
   updatePvAdd();
 }
 function addSearchResult(r,row){
+  if(swapIdx>=0&&tracks[swapIdx]){
+    const i=swapIdx,t=tracks[i];swapIdx=-1;
+    t.id=r.id;t.title=r.title;save();render();closeSearch();running=true;cutTo(i);
+    toast('「'+r.title.slice(0,24)+'」に置き換えました');return;
+  }
   if(tracks.some(t=>t.id===r.id)){toast('すでにメドレーにある曲です。');markAdded(row);return}
   const t={id:r.id,title:r.title,start:S.ds,len:S.dl};
   tracks.push(t);save();fixQueue();render();fetchTitle(t);
@@ -1628,7 +1663,7 @@ const lyrCache=new Map();
 const lyrNorm=x=>(x||'').toLowerCase().replace(/[\s\-–—_/・:：|｜「」『』【】\[\]()（）~～〜"'.,!?！？]+/g,'');
 function lyricQueries(title,author){
   const out=[];
-  const clean=x=>x.replace(/[【\[(（][^】\])）]*[】\])）]/g,' ').replace(/\b(official( music)? video|official|music video|mv|lyric video|lyrics?|audio|full ver\.?|short ver\.?)\b/ig,' ').replace(/\s+/g,' ').trim();
+  const clean=x=>x.replace(/[【\[(（][^】\])）]*[】\])）]/g,' ').replace(/\b(official( music)? video|official|music video|mv|lyric video|lyrics?|audio|full ver\.?|short ver\.?|instrumental|off ?vocal|karaoke|inst)\b/ig,' ').replace(/\s+/g,' ').trim();
   const q1=title.match(/[「『]([^」』]+)[」』]/);
   if(q1)out.push(q1[1]);
   const c=clean(title);
@@ -1864,9 +1899,11 @@ $('#nplist').addEventListener('click',e=>{
   const r=e.target.closest('.npi');if(!r)return;
   running=true;cutTo(+r.dataset.i);
 });
+function toggleNp(){document.body.classList.contains('np-open')?closeNp():openNp()}
+$('#npbtn').onclick=toggleNp;
 document.querySelector('.bar').addEventListener('click',e=>{
   if(e.target.closest('button,input,select,a,#volpop'))return;
-  document.body.classList.contains('np-open')?closeNp():openNp();
+  toggleNp();
 },true);
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
@@ -1920,6 +1957,147 @@ $('#repbtn').onclick=cycleRep;
 $('#one').onchange=e=>{S.one=e.target.checked;if(S.one)S.loop=true;save();syncRep()};
 $('#medauto').onchange=e=>{S.rel=e.target.checked;save();renderRel();renderNp()};
 setPmode(pmode);
+
+/* ---- サビの自動検出（歌詞の繰り返し）・インスト版への置き換え・ホーム画面に追加 ---- */
+let swapIdx=-1,deferredInstall=null;
+function detectChorus(L){
+  const norm=x=>x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,''),key=L.map(l=>norm(l.s)),cnt={};
+  key.forEach(k=>{if(k.length>=4)cnt[k]=(cnt[k]||0)+1});
+  const rep=key.map(k=>k.length>=4&&cnt[k]>=2);
+  let best=-1,bs=0;
+  for(let i=0;i<L.length;i++){
+    let sc=0;for(let j=i;j<Math.min(L.length,i+4);j++)if(rep[j])sc++;
+    if(rep[i]&&sc>bs){bs=sc;best=i}
+  }
+  return best>=0&&bs>=2?Math.max(0,L[best].t-0.5):null;
+}
+function applyChorus(t,lines){const s=detectChorus(lines);if(s==null)return null;t.start=Math.round(s);return t.start}
+$('#lyrchorus').onclick=()=>{
+  const t=tracks[idx];
+  if(!t||lyr.id!==t.id||!lyr.lines.length){toast('時刻付きの歌詞が表示されてから押してください');return}
+  const s=applyChorus(t,lyr.lines);
+  if(s==null){toast('サビを見つけられませんでした');return}
+  save();render();toast('サビの開始位置を '+fmt(s)+' に設定しました');
+};
+$('#chall').onclick=async()=>{
+  const b=$('#chall');b.disabled=true;let ok=0,n=0;
+  for(const t of tracks.slice()){
+    n++;rmsg('サビを探しています… '+n+'/'+tracks.length);
+    try{const r=lyrCache.get(t.id)||await findLyrics(t);if(r){lyrCache.set(t.id,r);if(r.lines.length&&applyChorus(t,r.lines)!=null)ok++}}catch(e){}
+  }
+  save();render();b.disabled=false;rmsg(ok+'曲のサビ位置を設定しました（時刻付きの歌詞がない曲は、そのままです）。');
+};
+$('#npinst').onclick=()=>{
+  const t=tracks[idx];if(!t){toast('再生中の曲がありません');return}
+  const base=(t.title||'').replace(/[【\[(（][^】\])）]*[】\])）]/g,' ').replace(/\s+/g,' ').trim();
+  swapIdx=idx;closeNp();$('#sq').value=base;
+  doSearch(base+' (Instrumental OR "Off Vocal" OR inst)');
+  toast('インスト版を探しています。見つけたら「置き換え」を押してください');
+};
+try{if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
+const standalone=!!(navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches));
+if(!standalone)$('#pwa').hidden=false;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e});
+$('#pwa').onclick=()=>{
+  if(deferredInstall){deferredInstall.prompt();deferredInstall=null;return}
+  alert(iOS?'Safariの共有ボタン（□に↑）から「ホーム画面に追加」を選んでください。':'ブラウザのメニューから「ホーム画面に追加」または「アプリをインストール」を選んでください。');
+};
+
+/* ---- オンライン対戦（ベータ・PeerJS） ---- */
+let oq=null;
+const oqMsg=t=>{$('#oqmsg').textContent=t};
+function oqLoadPeer(){return new Promise((res,rej)=>{if(window.Peer)return res();const e=document.createElement('script');e.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';e.onload=res;e.onerror=()=>rej(new Error('通信用の部品を読み込めませんでした'));document.head.appendChild(e)})}
+function oqName(){let n='';try{n=localStorage.getItem('medley-name')||''}catch(e){}if(!n){n=(prompt('ニックネームを入力してください')||'ゲスト').slice(0,12);try{localStorage.setItem('medley-name',n)}catch(e){}}return n}
+function oqView(){qshow('');$('#oqgame').hidden=false;$('#oqstart').hidden=!oq.host;$('#oqlisten').hidden=true;$('#oqch').innerHTML='';$('#oqfb').textContent='';$('#oqscore').innerHTML='';$('#oqhead').textContent='オンライン対戦（部屋コード：'+oq.code+'）'}
+function oqLeave(){if(!oq)return;const o=oq;oq=null;clearTimeout(o.timer);clearTimeout(o.pt);try{o.peer.destroy()}catch(e){}$('#oqgame').hidden=true;if(curTab==='quiz')qshow('qsetup')}
+const oqSend=m=>{if(oq.host){oq.conns.forEach(c=>c.open&&c.send(m));oqUI(m)}};
+function oqLobby(){oqSend({t:'lobby',list:Object.values(oq.players).map(p=>p.name)})}
+async function oqHost(){
+  try{await oqLoadPeer()}catch(e){oqMsg(e.message);return}
+  oqMsg('準備中…');
+  await Promise.all(tracks.filter(t=>!t.title).slice(0,80).map(async t=>{const m=await fetchMeta(t.id);if(m.ok)t.title=m.title}));
+  const pool=[];const seen=new Set();tracks.forEach(t=>{if(t.title&&!seen.has(t.title)){seen.add(t.title);pool.push(t)}});
+  if(pool.length<4){oqMsg('曲名の分かる曲が4曲以上必要です。');return}
+  const code=Math.random().toString(36).slice(2,7),name=oqName(),peer=new Peer('mdl-'+code);
+  peer.on('open',()=>{oq={host:true,peer,conns:[],code,pool,players:{me:{name,score:0}},i:-1};oqView();oqLobby();oqMsg('')});
+  peer.on('connection',c=>{
+    oq.conns.push(c);
+    c.on('data',d=>{
+      if(d.t==='hello'){oq.players[c.peer]={name:String(d.name||'ゲスト').slice(0,12),score:0};oqLobby()}
+      else if(d.t==='a')oqAnswer(c.peer,d.n,d.k,d.ms);
+    });
+    c.on('close',()=>{delete oq.players[c.peer];oq.conns=oq.conns.filter(x=>x!==c);oqLobby()});
+  });
+  peer.on('error',e=>oqMsg('接続エラー：'+e.type));
+}
+async function oqJoin(){
+  const code=$('#oqcode').value.trim().toLowerCase();if(!code){oqMsg('部屋コードを入力してください。');return}
+  try{await oqLoadPeer()}catch(e){oqMsg(e.message);return}
+  const name=oqName(),peer=new Peer();oqMsg('接続中…');
+  peer.on('open',()=>{
+    const c=peer.connect('mdl-'+code,{reliable:true});
+    c.on('open',()=>{oq={host:false,peer,conn:c,code};c.send({t:'hello',name});oqView();oqMsg('')});
+    c.on('data',d=>oqUI(d));
+    c.on('close',()=>{oqMsg('ホストとの接続が切れました。');oqLeave()});
+  });
+  peer.on('error',e=>oqMsg('接続できませんでした：'+e.type));
+}
+function oqStart(){
+  const n=Math.min(10,oq.pool.length);oq.qs=shuf(oq.pool).slice(0,n);oq.i=-1;
+  Object.values(oq.players).forEach(p=>p.score=0);oqNext();
+}
+function oqScores(){return Object.values(oq.players).map(p=>({name:p.name,score:p.score})).sort((a,b)=>b.score-a.score)}
+function oqNext(){
+  if(!oq||!oq.host)return;
+  oq.i++;
+  if(oq.i>=oq.qs.length){oqSend({t:'end',scores:oqScores()});return}
+  const t=oq.qs[oq.i],ch=shuf([t,...shuf(oq.pool.filter(x=>x!==t)).slice(0,3)]);
+  oq.cur={n:oq.i,ans:ch.indexOf(t),ch:ch.map(c=>c.title)};oq.answers={};
+  oqSend({t:'q',n:oq.i,total:oq.qs.length,id:t.id,start:$('#qmode').value==='list'?t.start:0,dur:+$('#qsec').value||5,ch:oq.cur.ch});
+  clearTimeout(oq.timer);oq.timer=setTimeout(oqReveal,30000);
+}
+function oqAnswer(id,n,k,ms){
+  if(!oq||!oq.cur||n!==oq.cur.n||oq.answers[id]!==undefined||!oq.players[id])return;
+  oq.answers[id]=k;
+  if(k===oq.cur.ans)oq.players[id].score+=10+Math.max(0,5-Math.floor((ms||0)/2000));
+  if(Object.keys(oq.answers).length>=Object.keys(oq.players).length)oqReveal();
+}
+function oqReveal(){
+  if(!oq||!oq.cur||oq.cur.done)return;oq.cur.done=true;clearTimeout(oq.timer);
+  oqSend({t:'r',n:oq.cur.n,ans:oq.cur.ans,scores:oqScores()});
+  oq.timer=setTimeout(oqNext,5000);
+}
+function oqBoard(list){$('#oqscore').innerHTML=list.map((p,i)=>`<div class="rl"><b>${i+1}</b><span>${esc(p.name)}　${p.score}点</span></div>`).join('')}
+function oqUI(m){
+  if(!oq)return;
+  if(m.t==='lobby'){$('#oqstat').textContent='参加者：'+m.list.join('、')}
+  else if(m.t==='q'){
+    oq.q=m;oq.t0=Date.now();oq.mine=null;$('#oqstart').hidden=true;
+    $('#oqstat').textContent='第'+(m.n+1)+'問 / '+m.total+'　「▶ 聞く」を押して、聞いてから答えましょう';
+    $('#oqch').innerHTML=m.ch.map((c,i)=>`<button class="choice" data-k="${i}" disabled>${esc(c)}</button>`).join('');
+    $('#oqfb').textContent='';$('#oqlisten').hidden=false;$('#oqlisten').textContent='▶ 聞く';
+  }else if(m.t==='r'){
+    clearTimeout(oq.pt);try{P().pauseVideo()}catch(e){}
+    $('#oqch').querySelectorAll('.choice').forEach(b=>{b.disabled=true;const k=+b.dataset.k;if(k===m.ans)b.classList.add('ok');else if(k===oq.mine)b.classList.add('ng')});
+    $('#oqfb').textContent=oq.mine===m.ans?'正解！':'ざんねん…';oqBoard(m.scores);$('#oqlisten').hidden=true;
+  }else if(m.t==='end'){
+    $('#oqstat').textContent='結果発表';$('#oqch').innerHTML='';$('#oqfb').textContent='';$('#oqlisten').hidden=true;oqBoard(m.scores);
+  }
+}
+$('#oqhost').onclick=oqHost;$('#oqjoin').onclick=oqJoin;$('#oqstart').onclick=()=>oq&&oq.host&&oqStart();$('#oqleave').onclick=oqLeave;
+$('#oqlisten').onclick=()=>{
+  if(!oq||!oq.q)return;
+  P().setVolume(VOL);P().loadVideoById({videoId:oq.q.id,startSeconds:oq.q.start});
+  clearTimeout(oq.pt);oq.pt=setTimeout(()=>{try{P().pauseVideo()}catch(e){}},oq.q.dur*1000);
+  $('#oqlisten').textContent='↻ もう一度聞く';$('#oqch').querySelectorAll('.choice').forEach(b=>{if(oq.mine==null)b.disabled=false});
+};
+$('#oqch').onclick=e=>{
+  const b=e.target.closest('.choice');if(!b||b.disabled||!oq||oq.mine!=null)return;
+  oq.mine=+b.dataset.k;const ms=Date.now()-oq.t0;
+  $('#oqch').querySelectorAll('.choice').forEach(x=>x.disabled=true);b.style.borderColor='var(--ac)';
+  $('#oqfb').textContent='回答しました。ほかの人を待っています…';
+  if(oq.host)oqAnswer('me',oq.q.n,oq.mine,ms);else oq.conn.send({t:'a',n:oq.q.n,k:oq.mine,ms});
+};
 
 /* ---- サビ位置の補助 ---- */
 let hold=false,dragging=false;
