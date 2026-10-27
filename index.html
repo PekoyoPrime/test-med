@@ -283,6 +283,7 @@ body.q #npbtn{display:none}
   <div class="brand">♪ メドレーメーカー</div>
   <nav id="tabs" role="tablist">
     <button class="tab" id="tab-med" role="tab" aria-selected="true">🎵 メドレー</button>
+    <button class="tab" id="tab-rel" role="tab" aria-selected="false">🔗 関連メドレー</button>
     <button class="tab" id="tab-quiz" role="tab" aria-selected="false">❓ イントロクイズ</button>
   </nav>
   <button id="lnew" class="ghost">＋ 新しいメドレー</button>
@@ -331,24 +332,11 @@ body.q #npbtn{display:none}
   <div class="row"><label><input id="shuffle" type="checkbox" style="width:auto"> シャッフル</label><label><input id="loop" type="checkbox" style="width:auto"> 最後まで行ったら最初に戻る</label><label><input id="one" type="checkbox" style="width:auto"> 1曲リピート</label><label><input id="medauto" type="checkbox" style="width:auto"> 関連曲を自動で追加</label></div>
 </section>
 
-<section>
-  <h2>関連曲</h2>
-  <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連する曲を集めます。「再生設定」の「関連曲を自動で追加」をオンにすると、曲が残り少なくなったときに、自動で足していきます。</p>
-  <div class="row"><button id="rmore" class="ghost">今すぐ関連曲を追加</button><button id="chall" class="ghost">全曲のサビを歌詞から設定</button><button id="rlst" class="ghost">このメドレーの関連曲で新しいメドレー</button><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
-  <label class="lab" for="rseed">ある曲の関連曲で、新しいメドレーを作る（動画のURL）</label>
-  <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
-  <div class="row"><button id="rstart">この曲の関連曲で新しいメドレー</button></div>
-  <p class="empty" id="rmsg" style="margin:8px 0 0"></p>
-</section>
 
-<section>
-  <div class="row" style="margin:0 0 8px;justify-content:space-between"><h2 style="margin:0">曲リスト</h2><button class="ghost" id="clearall">全曲を削除</button></div>
-  <p class="empty" id="listnote" style="font-size:13px;margin:0 0 4px"></p>
-  <div id="list"></div>
-</section>
 
 <section id="assist">
   <h2>サビ位置の補助</h2>
+  <div class="row" style="margin:0 0 8px"><button id="chall" class="ghost">全曲のサビを歌詞から設定</button></div>
   <div id="atitle" class="empty">曲を再生すると使えます。操作すると、その曲は自動で切り替わらず試聴モードになります。</div>
   <input id="seek" type="range" min="0" max="100" value="0" step="1" aria-label="再生位置" style="padding:0;border:0;background:none">
   <div id="pos" class="lab">0:00 / 0:00</div>
@@ -359,6 +347,14 @@ body.q #npbtn{display:none}
   <div class="row"><span class="lab" style="margin:0">この曲の長さ（秒）</span><button class="ghost" id="lenm5">−5</button><button class="ghost" id="lenm">−1</button><input id="alen" type="number" min="5" max="120" style="width:84px" aria-label="この曲の長さ"><button class="ghost" id="lenp">＋1</button><button class="ghost" id="lenp5">＋5</button></div>
   <div class="row"><button id="setstart2">今の位置を開始に</button></div>
 </section>
+
+<section>
+  <div class="row" style="margin:0 0 8px;justify-content:space-between"><h2 style="margin:0">曲リスト</h2><button class="ghost" id="clearall">全曲を削除</button></div>
+  <p class="empty" id="listnote" style="font-size:13px;margin:0 0 4px"></p>
+  <div id="list"></div>
+</section>
+
+
 </div>
 
 <div id="t-search" hidden>
@@ -374,6 +370,19 @@ body.q #npbtn{display:none}
 <div id="sres"></div>
 <div class="row"><button class="ghost" id="smore" hidden>さらに表示</button></div>
 <div id="gcse"></div>
+</div>
+
+<div id="t-rel" hidden>
+<section>
+  <h2>関連曲</h2>
+  <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連する曲を集めます。「再生設定」の「関連曲を自動で追加」をオンにすると、曲が残り少なくなったときに、自動で足していきます。</p>
+  <div class="row"><button id="rmore" class="ghost">今すぐ関連曲を追加</button><button id="rlst" class="ghost">このメドレーの関連曲で新しいメドレー</button><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
+  <label><input id="autochorus" type="checkbox" style="width:auto" checked> 追加した曲のサビ位置を、歌詞から自動で設定する</label>
+  <label class="lab" for="rseed">ある曲の関連曲で、新しいメドレーを作る（動画のURL）</label>
+  <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
+  <div class="row"><button id="rstart">この曲の関連曲で新しいメドレー</button></div>
+  <p class="empty" id="rmsg" style="margin:8px 0 0"></p>
+</section>
 </div>
 
 <div id="t-quiz" hidden>
@@ -507,7 +516,7 @@ let tracks=[],S={fade:3,ds:45,dl:30,key:'',loop:true,shuffle:false};
 let idx=-1,cur=0,players=[],running=false,armed=false,fading=false,fadeTimer=null;
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-const pick=o=>({fade:o.fade,ds:o.ds,dl:o.dl,loop:o.loop,shuffle:o.shuffle,rel:!!o.rel,mix:!!o.mix,one:!!o.one});
+const pick=o=>({fade:o.fade,ds:o.ds,dl:o.dl,loop:o.loop,shuffle:o.shuffle,rel:!!o.rel,mix:!!o.mix,one:!!o.one,ac:o.ac!==false});
 let lists=[],lid='';
 try{
   const d=JSON.parse(localStorage.getItem('medley2')||'null');
@@ -553,7 +562,7 @@ function render(){
 }
 $('#list').addEventListener('change',e=>{
   const f=e.target.dataset.f,i=+e.target.closest('.tr').dataset.i;if(!f)return;
-  if(f==='start'){tracks[i].start=parseT(e.target.value);e.target.value=fmt(tracks[i].start)}
+  if(f==='start'){tracks[i].us=1;tracks[i].start=parseT(e.target.value);e.target.value=fmt(tracks[i].start)}
   else{tracks[i].len=Math.min(120,Math.max(5,+e.target.value||30));e.target.value=tracks[i].len}
   save();syncLen();
 });
@@ -821,7 +830,7 @@ function stopAll(){
 function applyS(){$('#fade').value=S.fade;$('#ds').value=fmt(S.ds);$('#dl').value=S.dl;$('#loop').checked=S.loop;$('#shuffle').checked=S.shuffle;$('#medauto').checked=!!S.rel}
 function loadList(l){
   stopAll();lid=l.id;tracks=l.tracks;
-  S=Object.assign({fade:3,ds:45,dl:30,loop:true,shuffle:false,rel:false,mix:false,one:false},l.S||{});
+  S=Object.assign({fade:3,ds:45,dl:30,loop:true,shuffle:false,rel:false,mix:false,one:false,ac:true},l.S||{});
   applyS();resetBag();render();save();
 }
 function switchTo(id){save();const l=lists.find(x=>x.id===id);if(l)loadList(l)}
@@ -883,13 +892,14 @@ function setTab(t){
   else if(curTab==='quiz'){qOn=false;clearTimeout(qtimer);try{P().pauseVideo()}catch(e){}}
   if(t==='search'&&curTab!=='search')prevTab=curTab;
   curTab=t;
-  $('#t-med').hidden=t!=='med';$('#t-quiz').hidden=!q;$('#t-search').hidden=t!=='search';
+  $('#t-med').hidden=t!=='med';$('#t-rel').hidden=t!=='rel';$('#t-quiz').hidden=!q;$('#t-search').hidden=t!=='search';
   document.body.classList.toggle('q',q);document.body.classList.toggle('search-open',t==='search');document.body.classList.remove('side-open');
-  ['med','quiz'].forEach(k=>$('#tab-'+k).setAttribute('aria-selected',String(k===t)));
+  ['med','rel','quiz'].forEach(k=>$('#tab-'+k).setAttribute('aria-selected',String(k===t)));
   window.scrollTo(0,0);
 }
 $('#sclose').onclick=closeSearch;
 $('#tab-med').onclick=()=>setTab('med');
+$('#tab-rel').onclick=()=>setTab('rel');
 $('#tab-quiz').onclick=()=>setTab('quiz');
 $('#qimp').onclick=()=>{
   const d=parseShare($('#qlink').value);
@@ -1124,6 +1134,7 @@ function makeRelList(name,trs,rel){
   const l={id:uid(),name,tracks:trs.map(c=>({id:c.id,title:c.title||'',start:st.ds,len:st.dl})),S:st,rel};
   save();lists.push(l);loadList(l);
   l.tracks.forEach(t=>{if(!t.title)fetchTitle(t)});
+  if(S.ac!==false)chorusFor(l.tracks,'skip');
   if(!iOS)cutTo(queue[0]);
   return l;
 }
@@ -1194,7 +1205,8 @@ async function extendRelated(manual){
       got=(await relatedFromMix(seed,2,excl)).filter(c=>!titles.has(normT(c.title)));
     }
     if(!got.length){relNextTry=Date.now()+60000;rmsg('新しい関連曲が見つかりませんでした。');return}
-    got.forEach(c=>target.push({id:c.id,title:c.title,start:S.ds,len:S.dl}));
+    const added=got.map(c=>({id:c.id,title:c.title,start:S.ds,len:S.dl}));added.forEach(t=>target.push(t));
+    if(S.ac!==false)chorusFor(added,'skip');
     save();
     if(target===tracks){fixQueue();render()}
     rmsg(got.length+'曲を追加しました（全'+target.length+'曲）。');
@@ -1233,7 +1245,8 @@ function vetCued(){
     if(badDur(d))removeTrack(i);
   });
 }
-function renderRel(){$('#medauto').checked=!!S.rel}
+function renderRel(){$('#medauto').checked=!!S.rel;$('#autochorus').checked=S.ac!==false}
+$('#autochorus').onchange=e=>{S.ac=e.target.checked;save()};
 
 /* ---- 検索（Googleカスタム検索）・結果カード・プレビュー・追加 ---- */
 const CSE_ID='f0875449847e94ae8';
@@ -1979,13 +1992,20 @@ $('#lyrchorus').onclick=()=>{
   if(s==null){toast('サビを見つけられませんでした');return}
   save();render();toast('サビの開始位置を '+fmt(s)+' に設定しました');
 };
-$('#chall').onclick=async()=>{
-  const b=$('#chall');b.disabled=true;let ok=0,n=0;
-  for(const t of tracks.slice()){
-    n++;rmsg('サビを探しています… '+n+'/'+tracks.length);
-    try{const r=lyrCache.get(t.id)||await findLyrics(t);if(r){lyrCache.set(t.id,r);if(r.lines.length&&applyChorus(t,r.lines)!=null)ok++}}catch(e){}
+async function chorusFor(ts,mode){
+  let list=ts.slice();const us=list.filter(t=>t.us);
+  if(us.length&&!(mode==='ask'&&confirm(us.length+'曲は、自分で開始位置を設定しています。歌詞から検出した位置で上書きしますか？\n（キャンセルすると、その曲はそのままです）')))list=list.filter(t=>!t.us);
+  let ok=0,n=0;const b=$('#chall');
+  for(const t of list){
+    n++;if(mode==='ask')b.textContent='サビを探しています… '+n+'/'+list.length;
+    try{const r=lyrCache.get(t.id)||await findLyrics(t);if(r){lyrCache.set(t.id,r);if(r.lines.length&&applyChorus(t,r.lines)!=null){delete t.us;ok++}}}catch(e){}
   }
-  save();render();b.disabled=false;rmsg(ok+'曲のサビ位置を設定しました（時刻付きの歌詞がない曲は、そのままです）。');
+  save();render();return ok;
+}
+$('#chall').onclick=async()=>{
+  const b=$('#chall');b.disabled=true;
+  const ok=await chorusFor(tracks,'ask');
+  b.disabled=false;b.textContent='全曲のサビを歌詞から設定';toast(ok+'曲のサビ位置を設定しました（時刻付きの歌詞がない曲は、そのままです）');
 };
 $('#npinst').onclick=()=>{
   const t=tracks[idx];if(!t){toast('再生中の曲がありません');return}
@@ -2150,7 +2170,7 @@ $('#tostart').onclick=()=>{if(idx<0)step(1);else restartTrack()};
 $('#prev').onclick=()=>step(-1);
 $('#setstart2').onclick=()=>{
   const t=tracks[idx];if(!t||!players.length)return;
-  t.start=Math.floor(P().getCurrentTime());hold=false;save();render();
+  t.start=Math.floor(P().getCurrentTime());t.us=1;hold=false;save();render();
 };
 resetBag();render();handleHash();
 </script>
