@@ -275,6 +275,17 @@ body.np-open #npbtn svg{transform:rotate(180deg)}
 body.q #npbtn{display:none}
 @media (max-width:899px){.bar #npbtn{display:none}}
 #pwa{margin:6px 6px 0;border-radius:20px;padding:8px 14px}
+html,body{overscroll-behavior-y:none}
+#np{overscroll-behavior:none}
+@media (max-width:899px){#nphead,#npmain,#npswipe{touch-action:none}}
+#viz{display:none;position:fixed;z-index:36;left:var(--npx);top:var(--npy);width:var(--npw);height:var(--nph);border-radius:8px;background:#000;cursor:pointer}
+body.vz.np-ready #viz{display:block}
+#vzbar{display:none;position:fixed;z-index:38;left:var(--npx);top:var(--npy);width:var(--npw);justify-content:flex-end;gap:6px;padding:6px;pointer-events:none}
+body.np-ready #vzbar{display:flex}
+#vzbar button{pointer-events:auto;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:4px 10px;font-size:12px;line-height:1.3;width:auto;height:auto}
+#vzbar #vzn{display:none}
+body.vz #vzbar #vzn{display:inline-block}
+@media (max-width:899px){#viz{z-index:56;border-radius:12px}#vzbar{z-index:58}}
 </style>
 </head>
 <body>
@@ -484,6 +495,8 @@ body.q #npbtn{display:none}
   </div>
 </div>
 <div id="npswipe"></div>
+<canvas id="viz" aria-label="ビジュアライザー"></canvas>
+<div id="vzbar"><button id="vzn"></button><button id="vzt"></button></div>
 <div id="toast" hidden role="status" aria-live="polite"></div>
 <div class="bar"><div class="in">
   <div class="nowrow mc"><img id="nth" alt="" hidden width="48" height="27" style="width:48px;height:27px;object-fit:cover;border-radius:3px;flex:none"><span id="nowt">停止中</span><span id="remt"></span></div>
@@ -623,6 +636,8 @@ function playlistIds(pid){
   });
 }
 $('#plgo').onclick=async()=>{
+  const raw=$('#pl').value.trim();
+  if(/#[ms]=/.test(raw)){const d=parseShare(raw);if(d){importShare(d);$('#pl').value='';toast('共有リンクのメドレーを取り込みました');return}}
   const m=$('#pl').value.match(/list=([\w-]+)/),pid=m?m[1]:$('#pl').value.trim();
   if(!pid){alert('プレイリストのURLを入力してください。');return}
   const btn=$('#plgo');btn.disabled=true;btn.textContent='読み込み中…';
@@ -1844,6 +1859,7 @@ function openNp(){
   clearTimeout(npT);
   document.body.classList.add('np-open','np-ready');
   renderNp();lyrLoop();placeNp();npFollow();
+  if(window.vzStart)window.vzStart();
 }
 function closeNp(){
   if(window.cancelAnimationFrame)cancelAnimationFrame(lyrRaf);
@@ -2173,6 +2189,103 @@ $('#setstart2').onclick=()=>{
   t.start=Math.floor(P().getCurrentTime());t.us=1;hold=false;save();render();
 };
 resetBag();render();handleHash();
+
+/* ---- ビジュアライザー（PSP風・音には連動しない疑似アニメーション） ---- */
+(function(){
+  const cv=$('#viz'),cx=cv.getContext('2d'),NAMES=['ウェーブ','スペクトラム','バブル','リング','スターダスト'];
+  let on=false,kind=0,raf=0,last=0,lastPoll=0,playing=false,en=0.1,tm=0,pulse=0,hue=200,lastId='',dt=0.016,pk=[],bb=[],st=[];
+  try{const o=JSON.parse(localStorage.getItem('medley-viz')||'{}');on=!!o.on;kind=(o.k|0)%NAMES.length}catch(e){}
+  function apply(){
+    document.body.classList.toggle('vz',on);
+    $('#vzt').textContent=on?'映像に戻す':'ビジュアライザー';
+    $('#vzn').textContent=NAMES[kind]+' ▶';
+    try{localStorage.setItem('medley-viz',JSON.stringify({on:on,k:kind}))}catch(e){}
+    window.vzStart();
+  }
+  const band=(i,n)=>{const f=i/n;return Math.min(1,en*(0.15+0.85*(0.5+0.5*Math.sin(tm*(1.1+f*3.1)+i*1.7))*(0.55+0.45*Math.sin(tm*0.7+i*0.9))*(1-0.5*f)+pulse*(1-f)*0.5))};
+  function bg(w,h){const g=cx.createLinearGradient(0,0,0,h);g.addColorStop(0,`hsl(${hue},55%,${7+en*4}%)`);g.addColorStop(1,`hsl(${hue+50},60%,${14+en*5}%)`);cx.fillStyle=g;cx.fillRect(0,0,w,h)}
+  function wave(w,h){
+    bg(w,h);
+    for(let k=0;k<5;k++){
+      const amp=h*(0.06+0.12*en)*(1+k*0.15),base=h*0.55+(k-2)*h*0.035;
+      cx.beginPath();
+      for(let x=0;x<=w;x+=6){const u=x/w,y=base+Math.sin(u*5+tm*(0.9+k*0.25)+k)*amp*Math.sin(u*Math.PI)+Math.sin(u*11-tm*(1.3+k*0.2))*amp*0.3;x?cx.lineTo(x,y):cx.moveTo(x,y)}
+      cx.strokeStyle=`hsla(${hue+k*14},85%,75%,.6)`;cx.lineWidth=1.5;cx.stroke();
+      cx.lineTo(w,h);cx.lineTo(0,h);cx.closePath();cx.fillStyle=`hsla(${hue+k*14},80%,${55+k*4}%,${0.1+0.03*k})`;cx.fill();
+    }
+  }
+  function spec(w,h){
+    bg(w,h);
+    const n=w<480?16:28,gw=w*0.86,bw=gw/n,x0=(w-gw)/2,sh=Math.max(4,h*0.03),maxH=h*0.62,base=h*0.78;
+    if(pk.length!==n)pk=new Array(n).fill(0);
+    for(let i=0;i<n;i++){
+      const v=band(i,n),segs=Math.round(v*maxH/sh);pk[i]=Math.max(v,pk[i]-dt*0.5);
+      for(let k=0;k<segs;k++){
+        const c=`${hue+k*3+i*2},85%`;
+        cx.fillStyle=`hsl(${c},${55+k*0.8}%)`;cx.fillRect(x0+i*bw+1,base-(k+1)*sh,bw-2,sh-2);
+        if(k<segs*0.4){cx.fillStyle=`hsla(${c},60%,.18)`;cx.fillRect(x0+i*bw+1,base+k*sh+2,bw-2,sh-2)}
+      }
+      cx.fillStyle='#fff';cx.fillRect(x0+i*bw+1,base-pk[i]*maxH-sh-2,bw-2,2);
+    }
+  }
+  function bub(w,h){
+    bg(w,h);
+    if(!bb.length)for(let i=0;i<36;i++)bb.push({x:Math.random(),y:Math.random(),r:0.015+Math.random()*0.05,s:0.04+Math.random()*0.1,p:Math.random()*6.28});
+    for(const b of bb){
+      b.y-=b.s*dt*(0.3+en*1.5);if(b.y<-0.1){b.y=1.1;b.x=Math.random()}
+      const x=(b.x+Math.sin(tm*0.6+b.p)*0.03)*w,y=b.y*h,r=b.r*Math.min(w,h)*(1+pulse*0.25),c=hue+b.p*20;
+      const g=cx.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r);g.addColorStop(0,`hsla(${c},90%,85%,.55)`);g.addColorStop(1,`hsla(${c},90%,55%,.12)`);
+      cx.fillStyle=g;cx.beginPath();cx.arc(x,y,r,0,6.283);cx.fill();cx.strokeStyle=`hsla(${c},90%,85%,.5)`;cx.lineWidth=1;cx.stroke();
+    }
+  }
+  function rng(w,h){
+    bg(w,h);
+    const x=w/2,y=h/2,R=Math.hypot(w,h)/2,m=Math.min(w,h);
+    for(let i=0;i<7;i++){const f=(tm*0.18+i/7)%1;cx.strokeStyle=`hsla(${hue+i*12},90%,65%,${(1-f)*0.8})`;cx.lineWidth=1+en*3*(1-f);cx.beginPath();cx.arc(x,y,f*R*0.9,0,6.283);cx.stroke()}
+    for(let k=0;k<3;k++){cx.save();cx.translate(x,y);cx.rotate(tm*(0.3+k*0.2)*(k%2?-1:1));cx.setLineDash([8+k*6,10]);cx.strokeStyle=`hsla(${hue+40*k},90%,75%,.7)`;cx.lineWidth=2;cx.beginPath();cx.arc(0,0,m*(0.16+k*0.07)*(1+pulse*0.1),0,6.283);cx.stroke();cx.restore()}
+    cx.setLineDash([]);
+    const g=cx.createRadialGradient(x,y,0,x,y,m*(0.12+pulse*0.04));g.addColorStop(0,`hsla(${hue},90%,80%,.9)`);g.addColorStop(1,`hsla(${hue},90%,50%,0)`);
+    cx.fillStyle=g;cx.beginPath();cx.arc(x,y,m*0.2,0,6.283);cx.fill();
+  }
+  function stars(w,h){
+    cx.fillStyle=`hsl(${hue},50%,4%)`;cx.fillRect(0,0,w,h);
+    if(!st.length)for(let i=0;i<110;i++)st.push({a:Math.random()*6.283,z:Math.random()});
+    const x=w/2,y=h/2,R=Math.hypot(w,h)/2,sp=0.05+en*0.55;
+    for(const s of st){
+      s.z-=sp*dt;if(s.z<=0.02){s.z=1;s.a=Math.random()*6.283}
+      const r=(1-s.z)**2*R,rp=(1-Math.min(1,s.z+sp*0.08))**2*R,c=Math.cos(s.a),d=Math.sin(s.a);
+      cx.strokeStyle=`hsla(${hue+s.a*20},80%,${70+10*(1-s.z)}%,${1-s.z})`;cx.lineWidth=1+(1-s.z)*2;
+      cx.beginPath();cx.moveTo(x+c*rp,y+d*rp);cx.lineTo(x+c*r,y+d*r);cx.stroke();
+    }
+  }
+  const DRAW=[wave,spec,bub,rng,stars];
+  function loop(now){
+    raf=0;
+    if(!on||!document.body.classList.contains('np-ready'))return;
+    raf=requestAnimationFrame(loop);
+    if(document.hidden)return;
+    dt=Math.min(0.1,(now-last)/1000||0.016);last=now;
+    if(now-lastPoll>300){
+      lastPoll=now;
+      try{playing=P().getPlayerState()===1}catch(e){playing=false}
+      const tr=tracks[idx],id=tr?tr.id:'';
+      if(id!==lastId){lastId=id;let h=0;for(let i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))>>>0;hue=h%360}
+    }
+    en+=((playing?1:0.12)-en)*Math.min(1,dt*3);
+    tm+=dt*(0.25+0.75*en);
+    pulse=Math.pow(Math.max(0,Math.sin(tm*5.2)),8)*en;
+    const r=cv.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),W=Math.round(r.width*dpr),H=Math.round(r.height*dpr);
+    if(!W||!H)return;
+    if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+    cx.setTransform(dpr,0,0,dpr,0,0);
+    DRAW[kind](r.width,r.height);
+  }
+  window.vzStart=function(){if(on&&!raf){last=performance.now();raf=requestAnimationFrame(loop)}};
+  $('#vzt').onclick=()=>{on=!on;apply()};
+  $('#vzn').onclick=()=>{kind=(kind+1)%NAMES.length;apply()};
+  cv.onclick=()=>{kind=(kind+1)%NAMES.length;apply()};
+  apply();
+})();
 </script>
 </body>
 </html>
