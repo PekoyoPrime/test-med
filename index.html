@@ -253,7 +253,9 @@ button.nptab.on{color:var(--ink);border-bottom-color:var(--ink)}
 @media (max-width:899px){
   body.np-open.np-ready #npswipe{display:block;position:fixed;z-index:57;left:var(--npx);top:var(--npy);width:var(--npw);height:calc(var(--nph)*.45);touch-action:none}
 }
-body.q #fullbtn,body.q #repbtn{display:none}
+body.q #fullbtn,body.q #repbtn,body.q #shufbtn{display:none}
+.bar #shufbtn{opacity:.5}
+.bar #shufbtn.on{opacity:1}
 .bar #fullbtn,#npfull{flex:none;white-space:nowrap}
 .bar #fullbtn.on,.bar #repbtn.on,#npfull.on{background:var(--ac);color:var(--ac-ink);border-color:var(--ac)}
 #npfull{padding:8px 12px}
@@ -308,6 +310,9 @@ body.vzfs #vzctl{display:flex}
 #vzctl button{flex:none;min-width:0;width:calc(var(--vzh,24px)*1.1);height:calc(var(--vzh,24px)*1.1);border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;display:flex;align-items:center;justify-content:center;padding:0}
 #vzctl button svg{width:55%;height:55%;fill:currentColor}
 #vzctl #vzpp{background:#fff;color:#111}
+#vzctl #vzshuf,#vzctl #vzloop{opacity:.5}
+#vzctl #vzshuf.on,#vzctl #vzloop.on{opacity:1}
+@media (max-width:480px){.bar{padding-left:8px;padding-right:8px}.bar button.ico{width:36px;padding:0}.bar #fullbtn{padding:0 6px}.bar #volbtn{width:36px}}
 </style>
 </head>
 <body>
@@ -518,7 +523,7 @@ body.vzfs #vzctl{display:flex}
 </div>
 <div id="npswipe"></div>
 <canvas id="viz" aria-label="ビジュアライザー"></canvas>
-<div id="vzctl"><button id="vzprev" aria-label="前の曲"></button><button id="vzpp" aria-label="再生・一時停止"></button><button id="vznext" aria-label="次の曲"></button></div>
+<div id="vzctl"><button id="vzshuf" aria-label="シャッフル"></button><button id="vzprev" aria-label="前の曲"></button><button id="vzpp" aria-label="再生・一時停止"></button><button id="vznext" aria-label="次の曲"></button><button id="vzloop" aria-label="リピート"></button></div>
 <div id="vzbar"><button id="vza"></button><button id="vzn"></button><button id="vzf"></button><button id="vzt"></button></div>
 <div id="toast" hidden role="status" aria-live="polite"></div>
 <div class="bar"><div class="in">
@@ -527,6 +532,7 @@ body.vzfs #vzctl{display:flex}
   <div class="row" style="margin:0">
     <span class="row" style="margin:0;gap:8px">
       <button class="ghost" id="tostart" title="この曲の開始位置へ戻ります" aria-label="開始位置へ"><span class="ti" aria-hidden="true">⟲</span><span class="tt">開始位置へ</span></button>
+      <button class="ghost ico" id="shufbtn" aria-label="シャッフル" title="シャッフル"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
       <button class="ghost ico" id="prev" aria-label="前の曲" title="前の曲"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
       <button id="pp" class="ico" aria-label="再生" title="再生 / 一時停止"></button>
       <button class="ghost ico" id="next" aria-label="次の曲" title="次の曲"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
@@ -1703,7 +1709,7 @@ function renderNp(){
   $('#nps').textContent=t?(idx+1)+'/'+tracks.length+'曲':'';
   $('#npcur').textContent=l?l.name:'';
   $('#npauto').checked=!!S.rel;
-  $('#npshuf').classList.toggle('on',!!S.shuffle);
+  syncShuf();
   $('#nplist').innerHTML=queue.slice(Math.max(qpos,0)).map(i=>{
     const x=tracks[i];
     return `<div class="npi${i===idx?' on':''}" data-i="${i}"><span class="npth"><img src="https://i.ytimg.com/vi/${x.id}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></span><div class="npt"><span class="stt">${esc(x.title||x.id)}</span></div></div>`;
@@ -1942,7 +1948,9 @@ let npDrag=false;
 $('#npprev').onclick=()=>step(-1);
 $('#npnext').onclick=()=>step(1);
 $('#nppp').onclick=()=>$('#pp').click();
-$('#npshuf').onclick=()=>{S.shuffle=!S.shuffle;$('#shuffle').checked=S.shuffle;resetBag();save();render()};
+function syncShuf(){['#npshuf','#shufbtn'].forEach(q=>{const b=$(q);if(b)b.classList.toggle('on',!!S.shuffle)})}
+$('#npshuf').onclick=()=>{S.shuffle=!S.shuffle;$('#shuffle').checked=S.shuffle;resetBag();save();syncShuf();render()};
+$('#shufbtn').onclick=()=>$('#npshuf').click();
 $('#nploop').onclick=cycleRep;
 $('#npseek').addEventListener('input',()=>{npDrag=true;$('#npel').textContent=fmt(+$('#npseek').value)});
 $('#npseek').addEventListener('change',()=>{
@@ -2000,6 +2008,7 @@ function syncRep(){
     b.setAttribute('aria-label',repLabel());b.title=repLabel();
   });
   $('#loop').checked=!!S.loop;$('#one').checked=!!S.one;
+  syncShuf();
 }
 function cycleRep(){
   if(!S.loop&&!S.one)S.loop=true;
@@ -2237,7 +2246,7 @@ resetBag();render();handleHash();
 /* ---- ビジュアライザー（PSP風・音には連動しない疑似アニメーション） ---- */
 (function(){
   const cv=$('#viz'),cx=cv.getContext('2d'),NAMES=['ドットEQ','波形','バブル：リング','バブル：花火','リボン','ブロックEQ','アルバムアート','ランダム'];
-  let on=false,kind=0,raf=0,last=0,lastPoll=0,playing=false,en=0.1,tm=0,pulse=0,hue=200,lastId='',dt=0.016,pk=[],bb=[],st=[],an=null,ac=null,ms=null,fd=null,td=null,bassAvg=0,pv=0,hist=[],fc=0,rk=Math.floor(Math.random()*7),thumb={},SP={},tc=null,tg=null,auth={},rbT=0,rbHue=Math.random()*360,rsv=0,rbC=0,pl=1,agc=120,gn=1,wagc=0.2,bpk={},pal={},micMode=false,rg=[],pt=[],emitAcc=0,emitI=0,ang=0,seekHit=null,down=null,lastPP=null;
+  let on=false,kind=0,raf=0,last=0,lastPoll=0,playing=false,en=0.1,tm=0,pulse=0,hue=200,lastId='',dt=0.016,pk=[],bb=[],st=[],an=null,ac=null,ms=null,fd=null,td=null,bassAvg=0,pv=0,hist=[],fc=0,rk=Math.floor(Math.random()*7),thumb={},SP={},tc=null,tg=null,auth={},rbT=0,rbHue=Math.random()*360,rsv=0,rbC=0,pl=1,agc=120,gn=1,wagc=0.2,bpk={},pal={},micMode=false,rg=[],pt=[],vc=1,emitAcc=0,emitI=0,ang=0,seekHit=null,down=null,lastPP=null;
   try{const o=JSON.parse(localStorage.getItem('medley-viz')||'{}');on=!!o.on;kind=(o.k|0)%NAMES.length}catch(e){}
   function setFs(v){
     document.body.classList.toggle('vzfs',v);$('#vzf').textContent=v?'全画面を閉じる':'全画面';
@@ -2277,7 +2286,7 @@ resetBag();render();handleHash();
     let m=0;for(let k=a;k<b&&k<fd.length;k++)if(fd[k]>m)m=fd[k];
     if(!micMode)return Math.min(1,Math.pow(Math.min(255,m*gn)/255,1.4)*1.25);
     const arr=bpk[n]||(bpk[n]=new Array(n).fill(60));
-    arr[i]=Math.max(m,arr[i]*Math.exp(-dt*0.25));
+    arr[i]=Math.max(m,arr[i]*Math.exp(-dt*0.4));
     const ref=Math.max(40,(0.6*arr[i]+0.4*agc)*0.9);
     return Math.pow(Math.min(1,m/ref),1.5);
   };
@@ -2289,29 +2298,33 @@ resetBag();render();handleHash();
     g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.25,`rgba(${rgb},1)`);g.addColorStop(0.55,`rgba(${rgb},.35)`);g.addColorStop(1,`rgba(${rgb},0)`);
     x.fillStyle=g;x.fillRect(0,0,sz,sz);return SP[k]=c;
   }
-  /* 1: ドットのイコライザー（横長の長方形。下から青4段、黄3段、赤1段。12列） */
-  function rsp(key,rgb){
+  /* 1: ドットのイコライザー（小さな光の芯と、ぼやけた光。青緑4段、橙3段、赤1段。12列） */
+  function rsp(key,core,halo){
     const k='rect'+key;if(SP[k])return SP[k];
-    const c=document.createElement('canvas');c.width=96;c.height=48;const x=c.getContext('2d');
-    x.shadowColor=`rgb(${rgb})`;x.shadowBlur=14;x.fillStyle=`rgb(${rgb})`;x.fillRect(20,14,56,20);x.shadowBlur=0;
-    const g=x.createLinearGradient(0,14,0,34);g.addColorStop(0,'rgba(255,255,255,.85)');g.addColorStop(0.5,'rgba(255,255,255,.25)');g.addColorStop(1,'rgba(255,255,255,0)');
-    x.fillStyle=g;x.fillRect(20,14,56,20);return SP[k]=c;
+    const c=document.createElement('canvas');c.width=128;c.height=96;const x=c.getContext('2d');
+    x.save();x.translate(64,48);x.scale(1,0.75);
+    const g=x.createRadialGradient(0,0,0,0,0,64);g.addColorStop(0,`rgba(${halo},.85)`);g.addColorStop(0.45,`rgba(${halo},.38)`);g.addColorStop(1,`rgba(${halo},0)`);
+    x.fillStyle=g;x.fillRect(-64,-64,128,128);x.restore();
+    x.shadowColor=`rgb(${core})`;x.shadowBlur=8;x.fillStyle=`rgb(${core})`;x.fillRect(44,42,40,12);
+    x.shadowBlur=0;x.fillStyle='rgba(255,255,255,.85)';x.fillRect(50,45,28,6);
+    return SP[k]=c;
   }
   function eqd(w,h){
     cx.fillStyle='#000';cx.fillRect(0,0,w,h);
-    const n=12,N=8,x0=w*0.06,cw=w*0.88/n,top=h*0.31,bot=h*0.86,rh=(bot-top)/N,tw=cw*0.78,th=rh*0.55,sc=tw/56,sy=th/20;
-    const rowSp=k=>k<4?rsp('b','40,130,255'):k<7?rsp('a','255,170,60'):rsp('r','255,60,90');
+    const n=12,N=8,x0=w*0.06,cw=w*0.88/n,top=h*0.31,bot=h*0.85,rh=(bot-top)/N,sc=cw*1.1/128,sy=Math.max(sc,rh*1.6/96);
+    const rowSp=k=>k<4?rsp('b','150,245,255','50,190,210'):k<7?rsp('a','255,205,110','255,140,30'):rsp('r','255,110,110','255,40,60');
+    const put=(sp,x,y)=>cx.drawImage(sp,x-64*sc,y-48*sy,128*sc,96*sy);
     if(pk.length!==n)pk=new Array(n).fill(0);
     for(let i=0;i<n;i++){
       const lv=Math.round(Math.min(1,band(i,n)*(micMode?1.05:1))*N),x=x0+cw*(i+0.5);
       pk[i]=Math.max(lv,pk[i]-dt*2.5);
       for(let k=0;k<N;k++){
         const y=bot-rh*(k+0.5);
-        if(k<lv)cx.drawImage(rowSp(k),x-48*sc,y-24*sy,96*sc,48*sy);
-        else{cx.fillStyle='#4a4a4a';cx.fillRect(x-tw*0.18,y-Math.max(0.5,th*0.08),tw*0.36,Math.max(1,th*0.16))}
+        if(k<lv)put(rowSp(k),x,y);
+        else{cx.fillStyle='#34403b';cx.fillRect(x-cw*0.07,y-cw*0.05,cw*0.14,cw*0.1)}
       }
       const q=Math.min(N-1,Math.round(pk[i])-1);
-      if(q>=lv&&q>=0)cx.drawImage(rowSp(q),x-48*sc,bot-rh*(q+0.5)-24*sy,96*sc,48*sy);
+      if(q>=lv&&q>=0)put(rowSp(q),x,bot-rh*(q+0.5));
     }
   }
   /* 2: 波形（なめらかな曲線の残像つきオシロスコープ。色は時間とともに変わる） */
@@ -2323,9 +2336,9 @@ resetBag();render();handleHash();
       const bs=[0,2,5,9,14,20],am=bs.map(k=>band(k,24)),sw=1+pulse*0.3;
       for(let i=0;i<M;i++){const r=Math.abs(i/(M-1)-0.5)*2;let v=0;for(let k=0;k<6;k++)v+=am[k]*Math.sin((k+1.5)*r*4-tm*(1.2+0.55*k)+k*1.7)*(1-k*0.08);cur.push(v*0.5*sw)}
     }else if(an&&td){
-      an.getByteTimeDomainData(td);let mw=0;for(let i=0;i<td.length;i+=4){const a=Math.abs(td[i]-128)/128;if(a>mw)mw=a}
+      an.getByteTimeDomainData(td);let mw=0;for(let i=0;i<td.length;i+=4){const a=Math.abs(td[i]-128)/128*vc;if(a>mw)mw=a}
       wagc=Math.max(mw,wagc*Math.exp(-dt*0.3));const sc=Math.min(12,Math.max(0.7,0.7/Math.max(wagc,0.02)));
-      const q=Math.floor(td.length/M);for(let i=0;i<M;i++)cur.push((td[i*q]-128)/128*sc);
+      const q=Math.floor(td.length/M);for(let i=0;i<M;i++)cur.push((td[i*q]-128)/128*sc*vc);
     }else{
       for(let i=0;i<M;i++){const r=Math.abs(i/(M-1)-0.5)*2;cur.push((Math.sin(r*13-tm*5)*0.5+Math.sin(r*7-tm*7)*0.4+Math.sin(r*4-tm*2.3)*0.4)*en)}
     }
@@ -2406,24 +2419,29 @@ resetBag();render();handleHash();
     }
     cx.globalAlpha=1;cx.globalCompositeOperation='source-over';
   }
-  /* 4: 花火（ねずみ花火のように、回りながら泡を吹き出し続ける） */
+  /* 4: 花火（円形の発射口が画面を動き回り、ねずみ花火のように泡を吹き出す） */
   function bubF(w,h){
     seaBg(w,h);
-    const m=Math.min(w,h),t=tracks[idx],pc=t?palOf(t.id):null,Rmax=Math.hypot(w,h)/2*1.05;
+    const m=Math.min(w,h),t=tracks[idx],pc=t?palOf(t.id):null,Rmax=Math.hypot(w,h)/2*0.9,r0=m*0.07;
+    const ex=w/2+Math.sin(tm*0.37)*w*0.25,ey=h/2+Math.sin(tm*0.53+1)*h*0.22;
     ang+=dt*(2.6+1.5*en);
     emitAcc+=dt*(40+60*en);
     while(emitAcc>=1){
-      emitAcc--;const o=rb();
-      o.a=ang+(emitI++%3)*2.094+(Math.random()-0.5)*0.25;o.r=0;o.sp=(0.12+Math.random()*0.2)*m;o.cv=0.5+Math.random()*0.5;o.life=2.2+Math.random()*1.5;o.age=0;
+      emitAcc--;const o=rb(),a=ang+(emitI++%3)*2.094+(Math.random()-0.5)*0.25;
+      o.a=a;o.x0=ex+Math.cos(a)*r0;o.y0=ey+Math.sin(a)*r0;o.r=0;o.sp=(0.1+Math.random()*0.18)*m;o.cv=0.5+Math.random()*0.5;o.life=2.2+Math.random()*1.5;o.age=0;
       if(pt.length<260)pt.push(o);
     }
     for(let i=pt.length-1;i>=0;i--){
       const p=pt[i];p.age+=dt;p.r+=p.sp*dt;p.a+=p.cv*dt*(1-p.age/p.life*0.5);
       if(p.r>Rmax||p.age>p.life){pt.splice(i,1);continue}
       const f=Math.min(1,p.age/0.3)*Math.min(1,(p.life-p.age)/(p.life*0.3));
-      soft(w/2+Math.cos(p.a)*p.r,h/2+Math.sin(p.a)*p.r,m*(0.01+0.06*p.r/Rmax),p,pc,f*0.9);
+      soft(p.x0+Math.cos(p.a)*p.r,p.y0+Math.sin(p.a)*p.r,m*(0.01+0.06*p.r/Rmax),p,pc,f*0.9);
     }
-    cx.globalAlpha=1;cx.globalCompositeOperation='source-over';
+    cx.globalAlpha=1;
+    const g=cx.createRadialGradient(ex,ey,r0*0.2,ex,ey,r0*1.5);
+    g.addColorStop(0,'rgba(120,190,220,0)');g.addColorStop(0.6,'rgba(120,190,220,.22)');g.addColorStop(1,'rgba(120,190,220,0)');
+    cx.fillStyle=g;cx.beginPath();cx.arc(ex,ey,r0*1.5,0,6.283);cx.fill();
+    cx.globalCompositeOperation='source-over';
   }
   /* 5: リボン（2つの光る玉。残像も玉。色と背景はゆっくりグラデーション） */
   function rib(w,h){
@@ -2445,17 +2463,17 @@ resetBag();render();handleHash();
     }
     cx.globalCompositeOperation='source-over';
   }
-  /* 6: ブロックEQ（白地にパステルカラー。色はゆっくりグラデーション） */
+  /* 6: ブロックEQ（白地にパステルカラー。中央の1列を基準に、上下へ伸びる） */
   function blk(w,h){
     cx.fillStyle='#fff';cx.fillRect(0,0,w,h);
-    const n=w<480?14:20,N=12,x0=w*0.08,cw=w*0.84/n,top=h*0.32,bot=h*0.84,rh=(bot-top)/N;
+    const n=w<480?14:20,M=6,x0=w*0.08,cw=w*0.84/n,top=h*0.32,bot=h*0.84,rh=(bot-top)/(M*2+1),cy=top+rh*(M+0.5);
     if(pk.length!==n)pk=new Array(n).fill(0);
     for(let i=0;i<n;i++){
-      pk[i]+=(band(i,n)*N-pk[i])*Math.min(1,dt*12);
-      const lv=Math.max(1,Math.round(pk[i]));
-      for(let k=0;k<lv;k++){
-        cx.fillStyle=`hsl(${(tm*8+i*(180/n)+k*4)%360},75%,${72+k*0.8}%)`;
-        cx.fillRect(x0+i*cw+1,bot-(k+1)*rh+1,cw-2,rh-2);
+      pk[i]+=(band(i,n)*M-pk[i])*Math.min(1,dt*12);
+      const lv=Math.max(0,Math.round(pk[i]));
+      for(let k=-lv;k<=lv;k++){
+        cx.fillStyle=`hsl(${(tm*8+i*(180/n)+Math.abs(k)*5)%360},75%,${72+Math.abs(k)*1.2}%)`;
+        cx.fillRect(x0+i*cw+1,cy-k*rh-rh/2+1,cw-2,rh-2);
       }
     }
   }
@@ -2484,7 +2502,7 @@ resetBag();render();handleHash();
     const t=tracks[idx];if(!t)return;
     const S=Math.min(w/480,h/272),dk=k===5,fg=dk?'#222':'#fff',fz=px=>Math.max(9,px*S)+'px',FF='"Hiragino Sans","Yu Gothic",sans-serif';
     cx.save();cx.textBaseline='middle';
-    const bg=cx.createLinearGradient(0,0,0,24*S);bg.addColorStop(0,'#a9c8f0');bg.addColorStop(1,'#5f93d2');
+    const bg=cx.createLinearGradient(0,0,0,24*S);bg.addColorStop(0,'#b9c0cb');bg.addColorStop(1,'#7d8796');
     cx.fillStyle=bg;cx.fillRect(0,0,w,24*S);
     cx.fillStyle='#fff';cx.font=`600 ${fz(14)} ${FF}`;
     const l=lists.find(x=>x.id===lid),pos=`(${idx+1}/${tracks.length})`,rw=Math.max(w*0.45,w-rsv-6);
@@ -2533,14 +2551,19 @@ resetBag();render();handleHash();
       lastPoll=now;
       try{playing=P().getPlayerState()===1}catch(e){playing=false}
       if(lastPP!==playing){lastPP=playing;$('#vzpp').innerHTML=playing?IC.pause:IC.play}
+      const ns=$('#npshuf'),nl=$('#nploop'),vl=$('#vzloop');
+      $('#vzshuf').classList.toggle('on',!!(ns&&ns.classList.contains('on')));
+      if(nl){if(vl.dataset.ic!==nl.dataset.ic){vl.dataset.ic=nl.dataset.ic;vl.innerHTML=nl.innerHTML}vl.classList.toggle('on',nl.classList.contains('on'))}
+      try{vc=micMode?1:Math.min(6,Math.max(1,100/Math.max(5,P().getVolume())))}catch(e){vc=1}
       const tr=tracks[idx],id=tr?tr.id:'';
       if(id!==lastId){lastId=id;let h=0;for(let i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))>>>0;hue=h%360;rk=Math.floor(Math.random()*(NAMES.length-1))}
     }
     if(an){
       an.getByteFrequencyData(fd);
       let s=0,b=0;for(let k=0;k<60;k++)s+=fd[k];for(let k=1;k<7;k++)b+=fd[k];
+      if(vc>1)for(let k=0;k<fd.length;k++)fd[k]=Math.min(255,fd[k]*vc);
       let mx=0;for(let k=0;k<120;k++)if(fd[k]>mx)mx=fd[k];
-      agc=Math.max(mx,agc*Math.exp(-dt*0.2));gn=Math.min(8,Math.max(0.7,190/Math.max(agc,25)));
+      agc=Math.max(mx,agc*Math.exp(-dt*(micMode?0.5:0.3)));gn=Math.min(8,Math.max(0.7,215/Math.max(agc,25)));
       s=Math.min(1,s/60/255*gn);b=Math.min(255,b/6*gn);
       if(b>90&&b>bassAvg*1.25)pv=1;
       bassAvg+=(b-bassAvg)*Math.min(1,dt*1.5);pv*=Math.exp(-dt*6);
@@ -2610,6 +2633,10 @@ resetBag();render();handleHash();
   cv.addEventListener('pointerup',e=>{if(!down)return;const d=down;down=null;if(d.seek){$('#npseek').dispatchEvent(new Event('change'));return}if(Math.hypot(e.clientX-d.x,e.clientY-d.y)<10)$('#pp').click()});
   cv.addEventListener('pointercancel',()=>{down=null});
   const IC={prev:'<svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>',next:'<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>',play:'<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',pause:'<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>'};
+  IC.shuf='<svg viewBox="0 0 24 24"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>';
+  $('#vzshuf').innerHTML=IC.shuf;$('#vzloop').innerHTML=(typeof ICON_REP!=='undefined'?ICON_REP:'');
+  $('#vzshuf').onclick=()=>$('#npshuf').click();
+  $('#vzloop').onclick=()=>$('#nploop').click();
   $('#vzprev').innerHTML=IC.prev;$('#vznext').innerHTML=IC.next;$('#vzpp').innerHTML=IC.play;
   $('#vzprev').onclick=()=>$('#npprev').click();
   $('#vznext').onclick=()=>$('#npnext').click();
