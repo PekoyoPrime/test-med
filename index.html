@@ -283,10 +283,27 @@ body.vz.np-ready #viz{display:block}
 #vzbar{display:none;position:fixed;z-index:38;left:var(--npx);top:var(--npy);width:var(--npw);justify-content:flex-end;align-items:center;gap:6px;padding:0 6px;height:calc(var(--npw)*0.05);pointer-events:none}
 body.np-ready #vzbar{display:flex}
 #vzbar button{pointer-events:auto;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:0 .8em;font-size:clamp(9px,calc(var(--npw)*0.016),13px);line-height:1.6;width:auto;height:auto;white-space:nowrap}
-#vzbar #vzn,#vzbar #vza{display:none}
-body.vz #vzbar #vzn,body.vz #vzbar #vza{display:inline-block}
+#vzbar #vzn,#vzbar #vza,#vzbar #vzf{display:none}
+body.vz #vzbar #vzn,body.vz #vzbar #vza,body.vz #vzbar #vzf{display:inline-block}
 @media (max-width:899px){#viz{z-index:56;border-radius:12px}#vzbar{z-index:58}}
 body.np-ready .bar{z-index:37}
+body.vzfs #viz{left:env(safe-area-inset-left,0px);top:0;width:calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:100vh;height:100dvh;border-radius:0;z-index:9000}
+body.vzfs #vzbar{left:env(safe-area-inset-left,0px);top:0;width:calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:auto;padding:2px 6px;z-index:9001}
+body.vzfs #vzbar button{font-size:11px;line-height:1.5}
+@media (max-width:899px) and (orientation:landscape) and (max-height:520px){
+  #np{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  #nphead{padding:0 8px;min-height:36px}
+  #nphead button{width:36px;height:36px}
+  #npmain{flex:1;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto 1fr;column-gap:16px;padding:0 16px 8px;align-items:start}
+  #npstage{grid-column:1;grid-row:1 / span 3;margin:0;max-width:62vw;width:calc((100vh - 52px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))*16/9);width:calc((100dvh - 52px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))*16/9)}
+  #npinfo{grid-column:2;grid-row:1}
+  #npseekrow{grid-column:2;grid-row:2}
+  #npctl{grid-column:2;grid-row:3;align-self:center;padding:0}
+  #npctl button{width:40px;height:40px}
+  #npctl #nppp{width:56px;height:56px}
+  .npt2{font-size:16px;margin-top:0}
+  #npside{display:none}
+}
 </style>
 </head>
 <body>
@@ -341,7 +358,8 @@ body.np-ready .bar{z-index:37}
     <div class="grow"><label class="lab" for="ds">新しい曲の開始位置</label><input id="ds" placeholder="0:45"></div>
     <div class="grow"><label class="lab" for="dl">新しい曲の長さ（15〜60秒）</label><input id="dl" type="number" min="5" max="120"></div>
   </div>
-  <div class="row"><label><input id="shuffle" type="checkbox" style="width:auto"> シャッフル</label><label><input id="loop" type="checkbox" style="width:auto"> 最後まで行ったら最初に戻る</label><label><input id="one" type="checkbox" style="width:auto"> 1曲リピート</label><label><input id="medauto" type="checkbox" style="width:auto"> 関連曲を自動で追加</label></div>
+  <div class="row"><label><input id="shuffle" type="checkbox" style="width:auto"> シャッフル</label><label><input id="loop" type="checkbox" style="width:auto"> 最後まで行ったら最初に戻る</label><label><input id="one" type="checkbox" style="width:auto"> 1曲リピート</label><label><input id="medauto" type="checkbox" style="width:auto"> 関連曲を自動で追加</label><label><input id="autochorus" type="checkbox" style="width:auto" checked> 曲のサビ位置を、歌詞から自動で設定する（自分で設定した曲は、上書きするか確認します）</label></div>
+  <div class="row"><button class="ghost" id="npinst" title="再生中の曲のインスト版を探します">インスト</button><button class="ghost" id="npfull" aria-pressed="false" title="最初から最後まで再生します">フル</button><button class="ghost" id="npstart" title="再生中の曲の開始位置へ戻ります">開始位置へ</button></div>
 </section>
 
 
@@ -389,7 +407,6 @@ body.np-ready .bar{z-index:37}
   <h2>関連曲</h2>
   <p class="empty" style="font-size:13px;margin:0 0 8px">YouTubeの「ミックス」（自動で作られる関連動画のリスト）から、関連する曲を集めます。「再生設定」の「関連曲を自動で追加」をオンにすると、曲が残り少なくなったときに、自動で足していきます。</p>
   <div class="row"><button id="rmore" class="ghost">今すぐ関連曲を追加</button><button id="rlst" class="ghost">このメドレーの関連曲で新しいメドレー</button><label><input id="rinc" type="checkbox" style="width:auto"> 元の曲も混ぜる</label></div>
-  <label><input id="autochorus" type="checkbox" style="width:auto" checked> 追加した曲のサビ位置を、歌詞から自動で設定する</label>
   <label class="lab" for="rseed">ある曲の関連曲で、新しいメドレーを作る（動画のURL）</label>
   <input id="rseed" placeholder="https://www.youtube.com/watch?v=…">
   <div class="row"><button id="rstart">この曲の関連曲で新しいメドレー</button></div>
@@ -466,7 +483,7 @@ body.np-ready .bar{z-index:37}
   <div id="nphead"><button class="ghost" id="npclose2" aria-label="閉じる">⌄</button><span class="nphd">再生中</span><span style="width:44px"></span></div>
   <div id="npmain">
     <div id="npstage"></div>
-    <div id="npinfo"><div class="npinrow"><div class="npinl"><div id="npt" class="npt2"></div><div id="nps" class="empty" style="margin:2px 0 0"></div></div><button class="ghost" id="npinst">インスト</button><button class="ghost" id="npfull" aria-pressed="false">フル</button><button class="ghost" id="npstart">開始位置へ</button></div></div>
+    <div id="npinfo"><div class="npinrow"><div class="npinl"><div id="npt" class="npt2"></div><div id="nps" class="empty" style="margin:2px 0 0"></div></div></div></div>
     <div id="npseekrow">
       <input id="npseek" type="range" min="0" max="30" step="0.1" value="0" aria-label="再生位置">
       <div class="npts"><span id="npel">0:00</span><span id="npdur">0:30</span></div>
@@ -497,7 +514,7 @@ body.np-ready .bar{z-index:37}
 </div>
 <div id="npswipe"></div>
 <canvas id="viz" aria-label="ビジュアライザー"></canvas>
-<div id="vzbar"><button id="vza"></button><button id="vzn"></button><button id="vzt"></button></div>
+<div id="vzbar"><button id="vza"></button><button id="vzn"></button><button id="vzf"></button><button id="vzt"></button></div>
 <div id="toast" hidden role="status" aria-live="polite"></div>
 <div class="bar"><div class="in">
   <div class="nowrow mc"><img id="nth" alt="" hidden width="48" height="27" style="width:48px;height:27px;object-fit:cover;border-radius:3px;flex:none"><span id="nowt">停止中</span><span id="remt"></span></div>
@@ -604,14 +621,15 @@ $('#list').addEventListener('click',e=>{
 });
 
 function addIds(ids,titles){
-  const have=new Set(tracks.map(t=>t.id));let skip=0,add=0;
+  const have=new Set(tracks.map(t=>t.id)),nw=[];let skip=0,add=0;
   ids.forEach((id,n)=>{
     if(have.has(id)){skip++;return}
     have.add(id);add++;
-    const t={id,title:(titles&&titles[n])||'',start:S.ds,len:S.dl};tracks.push(t);
+    const t={id,title:(titles&&titles[n])||'',start:S.ds,len:S.dl};tracks.push(t);nw.push(t);
     if(!t.title)fetchTitle(t);
   });
   save();fixQueue();render();
+  if(S.ac!==false&&nw.length)chorusAuto(nw);
   const msg=(add?add+'曲を追加しました（全'+tracks.length+'曲）。':'')+(skip?skip+'曲は追加済みのためスキップしました。':'');
   $('#addmsg').textContent=msg;if(msg)toast(msg);
 }
@@ -848,6 +866,7 @@ function loadList(l){
   stopAll();lid=l.id;tracks=l.tracks;
   S=Object.assign({fade:3,ds:45,dl:30,loop:true,shuffle:false,rel:false,mix:false,one:false,ac:true},l.S||{});
   applyS();resetBag();render();save();
+  if(S.ac!==false)chorusAuto(tracks.filter(t=>!t.ca));
 }
 function switchTo(id){save();const l=lists.find(x=>x.id===id);if(l)loadList(l)}
 const curList=()=>lists.find(x=>x.id===lid);
@@ -1150,7 +1169,7 @@ function makeRelList(name,trs,rel){
   const l={id:uid(),name,tracks:trs.map(c=>({id:c.id,title:c.title||'',start:st.ds,len:st.dl})),S:st,rel};
   save();lists.push(l);loadList(l);
   l.tracks.forEach(t=>{if(!t.title)fetchTitle(t)});
-  if(S.ac!==false)chorusFor(l.tracks,'skip');
+  if(S.ac!==false)chorusAuto(l.tracks);
   if(!iOS)cutTo(queue[0]);
   return l;
 }
@@ -1222,7 +1241,7 @@ async function extendRelated(manual){
     }
     if(!got.length){relNextTry=Date.now()+60000;rmsg('新しい関連曲が見つかりませんでした。');return}
     const added=got.map(c=>({id:c.id,title:c.title,start:S.ds,len:S.dl}));added.forEach(t=>target.push(t));
-    if(S.ac!==false)chorusFor(added,'skip');
+    if(S.ac!==false)chorusAuto(added);
     save();
     if(target===tracks){fixQueue();render()}
     rmsg(got.length+'曲を追加しました（全'+target.length+'曲）。');
@@ -1552,6 +1571,7 @@ function addSearchResult(r,row){
   if(tracks.some(t=>t.id===r.id)){toast('すでにメドレーにある曲です。');markAdded(row);return}
   const t={id:r.id,title:r.title,start:S.ds,len:S.dl};
   tracks.push(t);save();fixQueue();render();fetchTitle(t);
+  if(S.ac!==false)chorusAuto([t]);
   markAdded(row);updatePvAdd();
   toast('「'+r.title.slice(0,24)+'」を追加しました（全'+tracks.length+'曲）');
 }
@@ -1863,6 +1883,7 @@ function openNp(){
   if(window.vzStart)window.vzStart();
 }
 function closeNp(){
+  if(window.vzExitFs)window.vzExitFs();
   if(window.cancelAnimationFrame)cancelAnimationFrame(lyrRaf);
   document.body.classList.remove('np-open');
   clearTimeout(npT);
@@ -2009,15 +2030,32 @@ $('#lyrchorus').onclick=()=>{
   if(s==null){toast('サビを見つけられませんでした');return}
   save();render();toast('サビの開始位置を '+fmt(s)+' に設定しました');
 };
+const chBusy=new Set();
+function chorusAuto(ts){window._chc=(window._chc||Promise.resolve()).then(()=>chorusFor(ts,'auto')).catch(()=>{})}
 async function chorusFor(ts,mode){
-  let list=ts.slice();const us=list.filter(t=>t.us);
-  if(us.length&&!(mode==='ask'&&confirm(us.length+'曲は、自分で開始位置を設定しています。歌詞から検出した位置で上書きしますか？\n（キャンセルすると、その曲はそのままです）')))list=list.filter(t=>!t.us);
+  const ask=mode==='ask',list=ts.filter(t=>ask||!t.ca);
   let ok=0,n=0;const b=$('#chall');
   for(const t of list){
-    n++;if(mode==='ask')b.textContent='サビを探しています… '+n+'/'+list.length;
-    try{const r=lyrCache.get(t.id)||await findLyrics(t);if(r){lyrCache.set(t.id,r);if(r.lines.length&&applyChorus(t,r.lines)!=null){delete t.us;ok++}}}catch(e){}
+    if(chBusy.has(t))continue;chBusy.add(t);
+    n++;if(ask&&b)b.textContent='サビを探しています… '+n+'/'+list.length;
+    try{
+      const r=lyrCache.get(t.id)||await findLyrics(t);
+      if(r)lyrCache.set(t.id,r);
+      const sv=r&&r.lines.length?detectChorus(r.lines):null;
+      if(sv!=null){
+        const ns=Math.round(sv);
+        if(t.us){
+          if(Math.abs(ns-t.start)>=1&&confirm('「'+(t.title||t.id).slice(0,40)+'」は、自分で開始位置（'+fmt(t.start)+'）を設定しています。\n歌詞から検出した位置（'+fmt(ns)+'）で上書きしますか？\n（キャンセルすると、そのままです）')){t.start=ns;delete t.us;ok++}
+        }else if(t.start!==ns){t.start=ns;ok++}
+      }
+      t.ca=1;
+    }catch(e){}
+    chBusy.delete(t);
+    await new Promise(r=>setTimeout(r,120));
   }
-  save();render();return ok;
+  save();render();
+  if(!ask&&ok)toast(ok+'曲のサビ位置を、歌詞から自動で設定しました');
+  return ok;
 }
 $('#chall').onclick=async()=>{
   const b=$('#chall');b.disabled=true;
@@ -2194,16 +2232,26 @@ resetBag();render();handleHash();
 /* ---- ビジュアライザー（PSP風・音には連動しない疑似アニメーション） ---- */
 (function(){
   const cv=$('#viz'),cx=cv.getContext('2d'),NAMES=['ドットEQ','波形','バブル','リボン','ブロックEQ','アルバムアート','ランダム'];
-  let on=false,kind=0,raf=0,last=0,lastPoll=0,playing=false,en=0.1,tm=0,pulse=0,hue=200,lastId='',dt=0.016,pk=[],bb=[],st=[],an=null,ac=null,ms=null,fd=null,td=null,bassAvg=0,pv=0,hist=[],fc=0,rk=Math.floor(Math.random()*6),thumb={},SP={},tc=null,tg=null,auth={},rbT=0,rbHue=Math.random()*360,rsv=0,rbC=0,pl=1;
+  let on=false,kind=0,raf=0,last=0,lastPoll=0,playing=false,en=0.1,tm=0,pulse=0,hue=200,lastId='',dt=0.016,pk=[],bb=[],st=[],an=null,ac=null,ms=null,fd=null,td=null,bassAvg=0,pv=0,hist=[],fc=0,rk=Math.floor(Math.random()*6),thumb={},SP={},tc=null,tg=null,auth={},rbT=0,rbHue=Math.random()*360,rsv=0,rbC=0,pl=1,agc=120,gn=1,wagc=0.2;
   try{const o=JSON.parse(localStorage.getItem('medley-viz')||'{}');on=!!o.on;kind=(o.k|0)%NAMES.length}catch(e){}
+  function setFs(v){
+    document.body.classList.toggle('vzfs',v);$('#vzf').textContent=v?'全画面を閉じる':'全画面';
+    try{
+      const el=document.documentElement;
+      if(v){const f=el.requestFullscreen||el.webkitRequestFullscreen;if(f&&!document.fullscreenElement&&!document.webkitFullscreenElement){const q=f.call(el);if(q&&q.catch)q.catch(()=>{})}}
+      else{const ex=document.exitFullscreen||document.webkitExitFullscreen;if(ex&&(document.fullscreenElement||document.webkitFullscreenElement)){const q=ex.call(document);if(q&&q.catch)q.catch(()=>{})}}
+    }catch(e){}
+  }
+  window.vzExitFs=()=>{if(document.body.classList.contains('vzfs'))setFs(false)};
   function apply(){
+    if(!on)setFs(false);
     document.body.classList.toggle('vz',on);
     $('#vzt').textContent=on?'映像に戻す':'ビジュアライザー';
     $('#vzn').textContent=NAMES[kind]+' ▶';
     try{localStorage.setItem('medley-viz',JSON.stringify({on:on,k:kind}))}catch(e){}
     window.vzStart();
   }
-  const bandR=(i,n)=>{const a=Math.floor(Math.pow(i/n,1.6)*120)+1,b=Math.max(a+1,Math.floor(Math.pow((i+1)/n,1.6)*120)+1);let m=0;for(let k=a;k<b&&k<fd.length;k++)m=Math.max(m,fd[k]);return Math.min(1,Math.pow(m/255,1.4)*1.25)};
+  const bandR=(i,n)=>{const a=Math.floor(Math.pow(i/n,1.6)*120)+1,b=Math.max(a+1,Math.floor(Math.pow((i+1)/n,1.6)*120)+1);let m=0;for(let k=a;k<b&&k<fd.length;k++)m=Math.max(m,fd[k]);return Math.min(1,Math.pow(Math.min(255,m*gn)/255,1.4)*1.25)};
   const band=(i,n)=>{if(an)return bandR(i,n);const f=i/n;return Math.min(1,en*(0.15+0.85*(0.5+0.5*Math.sin(tm*(1.1+f*3.1)+i*1.7))*(0.55+0.45*Math.sin(tm*0.7+i*0.9))*(1-0.5*f)+pulse*(1-f)*0.5))};
   function sprite(key,rgb,sz){
     const k=key+sz;if(SP[k])return SP[k];
@@ -2242,7 +2290,9 @@ resetBag();render();handleHash();
     cx.fillStyle='#2a2427';cx.fillRect(0,0,w,h);
     const M=48,H=(tm*25)%360,cy=h*0.62,A=h*0.26;
     let cur=[];
-    if(an&&td){an.getByteTimeDomainData(td);const q=Math.floor(td.length/M);for(let i=0;i<M;i++)cur.push((td[i*q]-128)/128*2.2)}
+    if(an&&td){an.getByteTimeDomainData(td);let mw=0;for(let i=0;i<td.length;i+=4){const a=Math.abs(td[i]-128)/128;if(a>mw)mw=a}
+      wagc=Math.max(mw,wagc*Math.exp(-dt*0.3));const sc=Math.min(12,Math.max(0.7,0.7/Math.max(wagc,0.02)));
+      const q=Math.floor(td.length/M);for(let i=0;i<M;i++)cur.push((td[i*q]-128)/128*sc)}
     else for(let i=0;i<M;i++){const u=i/M;cur.push((Math.sin(u*13+tm*5)*0.5+Math.sin(u*7-tm*7)*0.4+Math.sin(u*4+tm*2.3)*0.4)*en)}
     for(let pass=0;pass<3;pass++){const o=cur.slice();for(let i=1;i<M-1;i++)cur[i]=(o[i-1]+2*o[i]+o[i+1])/4}
     if(fc++%3===0){hist.push({d:cur,c:H});if(hist.length>22)hist.shift()}
@@ -2343,7 +2393,7 @@ resetBag();render();handleHash();
   const ell=(t,mw)=>{if(cx.measureText(t).width<=mw)return t;while(t.length>1&&cx.measureText(t+'…').width>mw)t=t.slice(0,-1);return t+'…'};
   function hdr(w,h,k){
     const t=tracks[idx];if(!t)return;
-    const S=w/480,dk=k===4,fg=dk?'#222':'#fff',fz=px=>Math.max(9,px*S)+'px',FF='"Hiragino Sans","Yu Gothic",sans-serif';
+    const S=Math.min(w/480,h/272),dk=k===4,fg=dk?'#222':'#fff',fz=px=>Math.max(9,px*S)+'px',FF='"Hiragino Sans","Yu Gothic",sans-serif';
     cx.save();cx.textBaseline='middle';
     const bg=cx.createLinearGradient(0,0,0,24*S);bg.addColorStop(0,'#a9c8f0');bg.addColorStop(1,'#5f93d2');
     cx.fillStyle=bg;cx.fillRect(0,0,w,24*S);
@@ -2370,15 +2420,9 @@ resetBag();render();handleHash();
     }
     cx.fillStyle=fg;cx.fillRect(tx,56*S,mw,Math.max(1,1.2*S));
     cx.font=`600 ${fz(12)} ${FF}`;cx.fillText(ell(authorOf(t.id),mw-70*S),tx,68*S);
-    cx.font=`700 ${fz(10)} sans-serif`;
-    const bw=cx.measureText(pos).width+12*S,bh=13*S,bx=w-14*S-bw;
-    cx.fillStyle=dk?'#555':'#fff';cx.fillRect(bx,62*S,bw,bh);
-    cx.fillStyle=dk?'#fff':'#222';cx.textAlign='center';cx.fillText(pos,bx+bw/2,62*S+bh/2+1);
+    cx.font=`700 ${fz(11)} sans-serif`;
+    cx.fillStyle=fg;cx.textAlign='right';cx.fillText(pos,w-14*S,69*S);
     /* 下：再生マーク、時間、進行バー */
-    cx.fillStyle=dk?'#555':'#fff';
-    const px=14*S,py=h-30*S;
-    if(playing){cx.beginPath();cx.moveTo(px,py-8*S);cx.lineTo(px+14*S,py);cx.lineTo(px,py+8*S);cx.closePath();cx.fill()}
-    else{cx.fillRect(px,py-8*S,5*S,16*S);cx.fillRect(px+9*S,py-8*S,5*S,16*S)}
     const el=$('#npel'),du=$('#npdur'),sk=$('#npseek');
     cx.fillStyle=dk?'#2a7fd0':'#8fd0ff';cx.font=`700 ${fz(15)} sans-serif`;cx.textAlign='right';
     cx.fillText(`${el?el.textContent:''} / ${du?du.textContent:''}`,w-14*S,h-28*S);
@@ -2403,7 +2447,9 @@ resetBag();render();handleHash();
     if(an){
       an.getByteFrequencyData(fd);
       let s=0,b=0;for(let k=0;k<60;k++)s+=fd[k];for(let k=1;k<7;k++)b+=fd[k];
-      s=s/60/255;b/=6;
+      let mx=0;for(let k=0;k<120;k++)if(fd[k]>mx)mx=fd[k];
+      agc=Math.max(mx,agc*Math.exp(-dt*0.2));gn=Math.min(8,Math.max(0.7,190/Math.max(agc,25)));
+      s=Math.min(1,s/60/255*gn);b=Math.min(255,b/6*gn);
       if(b>90&&b>bassAvg*1.25)pv=1;
       bassAvg+=(b-bassAvg)*Math.min(1,dt*1.5);pv*=Math.exp(-dt*6);
       en+=(Math.min(1,s*2.4+0.08)-en)*Math.min(1,dt*8);
@@ -2456,9 +2502,13 @@ resetBag();render();handleHash();
     syncBtn();
   }
   $('#vza').onclick=()=>{an?stopAudio():startAudio()};
+  $('#vzf').onclick=()=>setFs(!document.body.classList.contains('vzfs'));
+  document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('vzfs'))setFs(false)});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('vzfs'))setFs(false)});
   $('#vzt').onclick=()=>{on=!on;apply()};
   $('#vzn').onclick=()=>{kind=(kind+1)%NAMES.length;apply()};
-  cv.onclick=()=>{kind=(kind+1)%NAMES.length;apply()};
+  cv.onclick=()=>{$('#pp').click()};
+  $('#npswipe').addEventListener('click',()=>{if(document.body.classList.contains('vz'))$('#pp').click()});
   syncBtn();apply();
 })();
 </script>
