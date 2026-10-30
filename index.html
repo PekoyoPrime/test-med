@@ -2432,11 +2432,11 @@ resetBag();render();handleHash();
     emitAcc+=dt*(40+60*en);
     while(emitAcc>=1){
       emitAcc--;const o=rb(),a=ang+(emitI++%3)*2.094+(Math.random()-0.5)*0.25;
-      o.a=a;o.x0=ex+Math.cos(a)*r0;o.y0=ey+Math.sin(a)*r0;o.r=0;o.sp=(0.2+Math.random()*0.36)*m;o.cv=1+Math.random();o.life=2.2+Math.random()*1.5;o.age=0;
-      if(pt.length<260)pt.push(o);
+      o.a=a;o.x0=ex+Math.cos(a)*r0;o.y0=ey+Math.sin(a)*r0;o.r=0;o.sp=(0.2+Math.random()*0.36)*m;o.cv=1+Math.random();o.life=4+Math.random()*3;o.age=0;
+      if(pt.length<420)pt.push(o);
     }
     for(let i=pt.length-1;i>=0;i--){
-      const p=pt[i];p.age+=dt;p.r+=p.sp*dt;p.a+=p.cv*dt*(1-p.age/p.life*0.5);
+      const p=pt[i];p.age+=dt;p.sp*=Math.exp(-dt*0.5);p.r+=p.sp*dt;p.a+=p.cv*dt*(1-p.age/p.life*0.5);
       if(p.r>Rmax||p.age>p.life){pt.splice(i,1);continue}
       const f=Math.min(1,p.age/0.3)*Math.min(1,(p.life-p.age)/(p.life*0.3));
       soft(p.x0+Math.cos(p.a)*p.r,p.y0+Math.sin(p.a)*p.r,m*(0.01+0.06*p.r/Rmax),p,pc,f*0.9);
@@ -2624,7 +2624,7 @@ resetBag();render();handleHash();
       const AC=window.AudioContext||window.webkitAudioContext;
       ac=new AC();ms=stream;
       const src=ac.createMediaStreamSource(stream),a=ac.createAnalyser();
-      a.fftSize=1024;a.smoothingTimeConstant=0.6;src.connect(a);
+      a.fftSize=1024;a.smoothingTimeConstant=0.6;a.minDecibels=-100;a.maxDecibels=(how==='tab')?-5:-30;src.connect(a);
       fd=new Uint8Array(a.frequencyBinCount);td=new Uint8Array(a.fftSize);an=a;micMode=(how==='mic');micWarm=micMode?1.5:0;
       if(ac.state==='suspended')ac.resume();
       stream.getAudioTracks()[0].addEventListener('ended',stopAudio);
