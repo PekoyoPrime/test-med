@@ -2248,7 +2248,7 @@ resetBag();render();handleHash();
 /* ---- ビジュアライザー（PSP風・音には連動しない疑似アニメーション） ---- */
 (function(){
   const cv=$('#viz'),cx=cv.getContext('2d'),NAMES=['ドットEQ','波形','バブル：リング','バブル：花火','リボン','ブロックEQ','アルバムアート','ランダム'];
-  let on=false,kind=0,raf=0,last=0,lastPoll=0,playing=false,en=0.1,tm=0,pulse=0,hue=200,lastId='',dt=0.016,pk=[],bb=[],st=[],an=null,ac=null,ms=null,fd=null,td=null,bassAvg=0,pv=0,hist=[],fc=0,rk=Math.floor(Math.random()*7),thumb={},SP={},tc=null,tg=null,auth={},rbT=0,rbHue=Math.random()*360,rsv=0,rbC=0,pl=1,agc=120,gn=1,wagc=0.2,bpk={},pav={},pal={},micMode=false,rg=[],pt=[],vc=1,nfb=null,micWarm=0,gx=60,pb0=0,nfl={},emitAcc=0,emitI=0,ang=0,seekHit=null,down=null,lastPP=null;
+  let on=false,kind=0,raf=0,last=0,lastPoll=0,playing=false,en=0.1,tm=0,pulse=0,hue=200,lastId='',dt=0.016,pk=[],bb=[],st=[],an=null,ac=null,ms=null,fd=null,td=null,bassAvg=0,pv=0,hist=[],fc=0,rk=Math.floor(Math.random()*7),thumb={},SP={},tc=null,tg=null,auth={},rbT=0,rbHue=Math.random()*360,rsv=0,rbC=0,pl=1,agc=120,gn=1,wagc=0.2,bpk={},phs={},pal={},micMode=false,rg=[],pt=[],vc=1,nfb=null,micWarm=0,gx=60,pb0=0,nfl={},emitAcc=0,emitI=0,ang=0,seekHit=null,down=null,lastPP=null;
   try{const o=JSON.parse(localStorage.getItem('medley-viz')||'{}');on=!!o.on;kind=(o.k|0)%NAMES.length}catch(e){}
   function setFs(v){
     document.body.classList.toggle('vzfs',v);$('#vzf').textContent=v?'全画面を閉じる':'全画面';
@@ -2288,12 +2288,15 @@ resetBag();render();handleHash();
     const a=Math.floor(Math.pow(i/n,1.6)*120)+1,b=Math.max(a+1,Math.floor(Math.pow((i+1)/n,1.6)*120)+1);
     let m=0;for(let k=a;k<b&&k<fd.length;k++)if(fd[k]>m)m=fd[k];
     if(!micMode){
-      const x=Math.min(255,m*gn),av=pav[n]||(pav[n]=new Array(n).fill(0));
-      if(av[i]===0)av[i]=x;
-      const rel=Math.min(1,Math.max(0,(x/Math.max(av[i],20)-0.75)/0.75));
-      av[i]+=(x-av[i])*Math.min(1,dt/1.5);
-      const ab=Math.min(1,Math.max(0,(x-90)/125));
-      return Math.pow(Math.min(1,ab*0.5+rel*ab*0.55),1.1);
+      /* PC：直近約2.5秒の中での順位（パーセンタイル）で高さを決める。音量や曲の大きさに左右されず、常に上限に張り付かない */
+      const hs=phs[n]||(phs[n]=Array.from({length:n},()=>null));
+      let o=hs[i];
+      if(!o){o={b:new Float32Array(150).fill(m),p:0};hs[i]=o}
+      let lo=0,eq=0;for(let k=0;k<150;k++){const y=o.b[k];if(y<m)lo++;else if(y===m)eq++}
+      const rank=(lo+eq*0.5)/150;
+      o.b[o.p]=m;o.p=(o.p+1)%150;
+      if(m<50)return 0;
+      return Math.pow(rank,1.7)*Math.min(1,(m-50)/100);
     }
     let ex=0;for(let k=a;k<b&&k<fd.length;k++){const e=fd[k]-(nfb?nfb[k]:fd[k]);if(e>ex)ex=e}
     ex=Math.max(0,ex-24);
@@ -2562,7 +2565,7 @@ resetBag();render();handleHash();
       const ns=$('#npshuf'),nl=$('#nploop'),vl=$('#vzloop');
       $('#vzshuf').classList.toggle('on',!!(ns&&ns.classList.contains('on')));
       if(nl){if(vl.dataset.ic!==nl.dataset.ic){vl.dataset.ic=nl.dataset.ic;vl.innerHTML=nl.innerHTML}vl.classList.toggle('on',nl.classList.contains('on'))}
-      try{vc=micMode?1:Math.min(6,Math.max(1,100/Math.max(5,P().getVolume())))}catch(e){vc=1}
+      vc=1;
       const tr=tracks[idx],id=tr?tr.id:'';
       if(id!==lastId){lastId=id;let h=0;for(let i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))>>>0;hue=h%360;rk=Math.floor(Math.random()*(NAMES.length-1))}
     }
